@@ -1,0 +1,896 @@
+use crate::backend::component::alu::{Alu, AluMux1, AluMux2};
+use crate::backend::component::cmp::{Cmp, CmpMux};
+use crate::backend::component::ir::IR;
+use crate::backend::component::mar::{Mar, MarMux};
+use crate::backend::component::mem_ctl::MemCtl;
+use crate::backend::component::mrdr::Mrdr;
+use crate::backend::component::mwdr::Mwdr;
+use crate::backend::component::pc::{Pc, PcMux};
+use crate::backend::component::regfile::{RegFile, RegFileMux};
+use crate::frontend::util::datapath_net::DatapathNet;
+use crate::frontend::util::datapath_net::DatapathNet::*;
+use eframe::emath::Align;
+use egui::{Color32, Frame, Response, Stroke, Ui, Widget};
+use egui::{Layout, Pos2, Vec2};
+use std::collections::HashSet;
+
+#[derive(Debug, Clone)]
+pub struct PortValue {
+    pub name: String,
+    pub value: String,
+    pub associated_nets: HashSet<DatapathNet>,
+}
+
+impl PortValue {
+    pub fn new(name: String, value: String, associated_nets: HashSet<DatapathNet>) -> Self {
+        Self {
+            name,
+            value,
+            associated_nets,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct PortValues {
+    pub inputs: Vec<PortValue>,
+    pub outputs: Vec<PortValue>,
+}
+
+impl PortValues {
+    pub fn new(inputs: Vec<PortValue>, outputs: Vec<PortValue>) -> Self {
+        Self { inputs, outputs }
+    }
+}
+
+pub struct DatapathComponent<'a> {
+    pub name: String,
+    pub values: PortValues,
+    pub port_highlight_nets: &'a mut HashSet<DatapathNet>,
+}
+
+impl Widget for DatapathComponent<'_> {
+    fn ui(self, ui: &mut Ui) -> Response {
+        let name = self.name;
+        let port_values = self.values;
+        let mut on_hover = |ui: &mut Ui, port_value: &PortValue| {
+            ui.label(port_value.name.clone()).on_hover_ui(|ui| {
+                ui.add_sized(Vec2::new(90.0, 10.0), |ui: &mut Ui| {
+                    ui.text_edit_singleline(&mut port_value.value.clone())
+                });
+                self.port_highlight_nets.extend(&port_value.associated_nets);
+            })
+        };
+
+        Frame::none()
+            .inner_margin(5.0)
+            .rounding(6.0)
+            .stroke(Stroke::new(1.0, Color32::GRAY))
+            .show(ui, |ui| {
+                ui.vertical(|ui| {
+                    ui.strong(name.clone());
+                    ui.separator();
+                });
+                ui.vertical_centered(|ui| {
+                    egui::Grid::new(format!("{}_grid", name.clone()))
+                        .num_columns(2)
+                        .show(ui, |ui| {
+                            for i in 0..port_values.inputs.len().max(port_values.outputs.len()) {
+                                ui.with_layout(Layout::left_to_right(Align::Center), |ui| {
+                                    port_values
+                                        .inputs
+                                        .get(i)
+                                        .map(|port_value| on_hover(ui, port_value));
+                                });
+                                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                                    port_values
+                                        .outputs
+                                        .get(i)
+                                        .map(|port_value| on_hover(ui, port_value));
+                                });
+                                ui.end_row();
+                            }
+                        });
+                })
+            })
+            .response
+    }
+}
+
+pub const GLOBAL_FRAME_WIDTH: f32 = 110.0;
+
+pub trait DatapathComponentDisplayer {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a>;
+    fn get_frame_offset(&self) -> Pos2;
+    fn get_frame_size(&self) -> Vec2;
+}
+
+impl DatapathComponentDisplayer for Alu {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "ALU".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "b".to_string(),
+                        format!("0x{:X}", self.b.get_value()),
+                        [AluMux2_out_Alu_b].into(),
+                    ),
+                    PortValue::new(
+                        "a".to_string(),
+                        format!("0x{:X}", self.a.get_value()),
+                        [AluMux1_out_Alu_a].into(),
+                    ),
+                    PortValue::new(
+                        "op".to_string(),
+                        format!("0b{:3b}", self.op.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [Alu_out_MarMux_alu_out, Alu_out_PcMux_alu_out].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(1040.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for AluMux1 {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "ALU Mux 1".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "rs1_data".to_string(),
+                        format!("0x{:X}", self.rs1.get_value()),
+                        [RegFile_rs1_data_AluMux1_rs1_data].into(),
+                    ),
+                    PortValue::new(
+                        "pc".to_string(),
+                        format!("0x{:X}", self.pc.get_value()),
+                        [Pc_out_AluMux1_pc].into(),
+                    ),
+                    PortValue::new(
+                        "sel".to_string(),
+                        format!("0b{:2b}", self.sel.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [AluMux1_out_Alu_a].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(910.0, 310.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for AluMux2 {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "ALU Mux 2".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "i_imm".to_string(),
+                        format!("0x{:X}", self.i_imm.get_value()),
+                        [Ir_i_imm_AluMux2_i_imm].into(),
+                    ),
+                    PortValue::new(
+                        "u_imm".to_string(),
+                        format!("0x{:X}", self.u_imm.get_value()),
+                        [Ir_u_imm_AluMux2_u_imm].into(),
+                    ),
+                    PortValue::new(
+                        "b_imm".to_string(),
+                        format!("0x{:X}", self.b_imm.get_value()),
+                        [Ir_b_imm_AluMux2_b_imm].into(),
+                    ),
+                    PortValue::new(
+                        "s_imm".to_string(),
+                        format!("0x{:X}", self.s_imm.get_value()),
+                        [Ir_s_imm_AluMux2_s_imm].into(),
+                    ),
+                    PortValue::new(
+                        "j_imm".to_string(),
+                        format!("0x{:X}", self.j_imm.get_value()),
+                        [Ir_j_imm_AluMux2_j_imm].into(),
+                    ),
+                    PortValue::new(
+                        "rs2_data".to_string(),
+                        format!("0x{:X}", self.rs2.get_value()),
+                        [RegFile_rs2_data_AluMux2_rs2_data].into(),
+                    ),
+                    PortValue::new(
+                        "sel".to_string(),
+                        format!("0b{:3b}", self.sel.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [AluMux2_out_Alu_b].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(910.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for CmpMux {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "CMP Mux".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "rs2_data".to_string(),
+                        format!("0x{:X}", self.rs2.get_value()),
+                        [RegFile_rs2_data_CmpMux_rs2_data].into(),
+                    ),
+                    PortValue::new(
+                        "i_imm".to_string(),
+                        format!("0x{:X}", self.i_imm.get_value()),
+                        [Ir_i_imm_CmpMux_i_imm].into(),
+                    ),
+                    PortValue::new(
+                        "sel".to_string(),
+                        format!("0x{:2b}", self.sel.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [CmpMux_out_Cmp_b].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(910.0, 480.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for Cmp {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "CMP".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "a".to_string(),
+                        format!("0x{:X}", self.a.get_value()),
+                        [RegFile_rs1_data_Cmp_a].into(),
+                    ),
+                    PortValue::new(
+                        "b".to_string(),
+                        format!("0x{:X}", self.b.get_value()),
+                        [CmpMux_out_Cmp_b].into(),
+                    ),
+                    PortValue::new(
+                        "op".to_string(),
+                        format!("0x{:3b}", self.op.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [Cmp_out_RegFileMux_Cmp_out].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(1040.0, 430.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for IR {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "IR".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "data".to_string(),
+                        format!("0x{:X}", self.data.get_value()),
+                        [MrDR_out_IR_data].into(),
+                    ),
+                    PortValue::new(
+                        "load".to_string(),
+                        format!("0b{:1b}", self.load.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![
+                    PortValue::new(
+                        "i_imm".to_string(),
+                        format!("0x{:X}", self.i_imm.get_value()),
+                        [Ir_i_imm_CmpMux_i_imm, Ir_i_imm_AluMux2_i_imm].into(),
+                    ),
+                    PortValue::new(
+                        "u_imm".to_string(),
+                        format!("0x{:X}", self.u_imm.get_value()),
+                        [Ir_u_imm_AluMux2_u_imm, Ir_u_imm_RegFileMux_u_imm].into(),
+                    ),
+                    PortValue::new(
+                        "b_imm".to_string(),
+                        format!("0x{:X}", self.b_imm.get_value()),
+                        [Ir_b_imm_AluMux2_b_imm].into(),
+                    ),
+                    PortValue::new(
+                        "s_imm".to_string(),
+                        format!("0x{:X}", self.s_imm.get_value()),
+                        [Ir_s_imm_AluMux2_s_imm].into(),
+                    ),
+                    PortValue::new(
+                        "j_imm".to_string(),
+                        format!("0x{:X}", self.j_imm.get_value()),
+                        [Ir_j_imm_AluMux2_j_imm].into(),
+                    ),
+                    PortValue::new(
+                        "rs1_idx".to_string(),
+                        format!("0x{:X}", self.rs1.get_value()),
+                        [Ir_rs1_idx_RegFile_rs1_idx].into(),
+                    ),
+                    PortValue::new(
+                        "rs2_idx".to_string(),
+                        format!("0x{:X}", self.rs2.get_value()),
+                        [Ir_rs2_idx_RegFile_rs2_idx].into(),
+                    ),
+                    PortValue::new(
+                        "rd_idx".to_string(),
+                        format!("0x{:X}", self.rd.get_value()),
+                        [Ir_rd_idx_RegFile_rd_idx].into(),
+                    ),
+                    PortValue::new(
+                        "funct3".to_string(),
+                        format!("0x{:X}", self.funct3.get_value()),
+                        [].into(),
+                    ),
+                    PortValue::new(
+                        "funct7".to_string(),
+                        format!("0x{:X}", self.funct7.get_value()),
+                        [].into(),
+                    ),
+                    PortValue::new(
+                        "opcode".to_string(),
+                        format!("0x{:X}", self.opcode.get_value()),
+                        [].into(),
+                    ),
+                ],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(310.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 75.0)
+    }
+}
+
+impl DatapathComponentDisplayer for Mar {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "MAR".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "data".to_string(),
+                        format!("0x{:X}", self.data.get_value()),
+                        [MarMux_out_Mar_data].into(),
+                    ),
+                    PortValue::new(
+                        "load".to_string(),
+                        format!("0b{:1b}", self.load.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [
+                        Mar_out_MemCtl_addr,
+                        Mar_out_MwDR_mar,
+                        Mar_out_RegFileMux_mar,
+                    ]
+                    .into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(180.0, 430.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for MarMux {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "MAR Mux".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "pc".to_string(),
+                        format!("0x{:X}", self.pc.get_value()),
+                        [Pc_out_MarMux_pc].into(),
+                    ),
+                    PortValue::new(
+                        "alu_out".to_string(),
+                        format!("0x{:X}", self.alu_out.get_value()),
+                        [Alu_out_MarMux_alu_out].into(),
+                    ),
+                    PortValue::new(
+                        "sel".to_string(),
+                        format!("0b{:1b}", self.sel.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [MarMux_out_Mar_data].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(50.0, 430.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for MemCtl {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "MemCtl".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "addr".to_string(),
+                        format!("0x{:X}", self.cpu_addr.get_value()),
+                        [Mar_out_MemCtl_addr].into(),
+                    ),
+                    PortValue::new(
+                        "wdata".to_string(),
+                        format!("0x{:X}", self.cpu_wdata.get_value()),
+                        [MwDR_out_MemCtl_wdata].into(),
+                    ),
+                    PortValue::new(
+                        "rd_en".to_string(),
+                        format!("0b{:1b}", self.cpu_read_en.get_value()),
+                        [].into(),
+                    ),
+                    PortValue::new(
+                        "rmask".to_string(),
+                        format!("0b{:4b}", self.cpu_rmask.get_value()),
+                        [].into(),
+                    ),
+                    PortValue::new(
+                        "wr_en".to_string(),
+                        format!("0b{:1b}", self.cpu_write_en.get_value()),
+                        [].into(),
+                    ),
+                    PortValue::new(
+                        "wmask".to_string(),
+                        format!("0x{:4b}", self.cpu_wmask.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![
+                    PortValue::new(
+                        "rdata".to_string(),
+                        format!("0x{:X}", self.cpu_rdata.get_value()),
+                        [MemCtl_rdata_MrDR_rdata].into(),
+                    ),
+                    PortValue::new(
+                        "resp".to_string(),
+                        format!("0b{:1b}", self.cpu_resp.get_value()),
+                        [].into(),
+                    ),
+                ],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(50.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 75.0)
+    }
+}
+
+impl DatapathComponentDisplayer for Mrdr {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "MrDR".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "rdata".to_string(),
+                        format!("0x{:X}", self.data.get_value()),
+                        [MemCtl_rdata_MrDR_rdata].into(),
+                    ),
+                    PortValue::new(
+                        "load".to_string(),
+                        format!("0x{:X}", self.load.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [MrDR_out_IR_data, MrDr_out_RegFileMux_mrdr].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(180.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for Mwdr {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "MwDR".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "mar".to_string(),
+                        format!("0x{:X}", self.mar.get_value()),
+                        [Mar_out_MwDR_mar].into(),
+                    ),
+                    PortValue::new(
+                        "rs2_data".to_string(),
+                        format!("0x{:X}", self.rs2_data.get_value()),
+                        [RegFile_rs2_data_MwDR_rs2_data].into(),
+                    ),
+                    PortValue::new(
+                        "load".to_string(),
+                        format!("0x{:X}", self.load.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [MwDR_out_MemCtl_wdata].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(180.0, 310.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for Pc {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "PC".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "data".to_string(),
+                        format!("0x{:X}", self.data.get_value()),
+                        [PcMux_out_Pc_data].into(),
+                    ),
+                    PortValue::new(
+                        "load".to_string(),
+                        format!("0x{:X}", self.load.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [
+                        Pc_out_MarMux_pc,
+                        Pc_out_AluMux1_pc,
+                        Pc_out_PcMux_pc,
+                        Pc_out_RegFileMux_pc,
+                    ]
+                    .into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(180.0, 550.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for PcMux {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "PC Mux".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "pc".to_string(),
+                        format!("0x{:X}", self.pc.get_value()),
+                        [Pc_out_PcMux_pc].into(),
+                    ),
+                    PortValue::new(
+                        "alu_out".to_string(),
+                        format!("0x{:X}", self.alu_out.get_value()),
+                        [Alu_out_PcMux_alu_out].into(),
+                    ),
+                    PortValue::new(
+                        "sel".to_string(),
+                        format!("0b{:1b}", self.sel.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [PcMux_out_Pc_data].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(50.0, 550.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for RegFile {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "RegFile".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "rs1_idx".to_string(),
+                        format!("0b{:5b}", self.rs1_idx.get_value()),
+                        [Ir_rs1_idx_RegFile_rs1_idx].into(),
+                    ),
+                    PortValue::new(
+                        "rs2_idx".to_string(),
+                        format!("0b{:5b}", self.rs2_idx.get_value()),
+                        [Ir_rs2_idx_RegFile_rs2_idx].into(),
+                    ),
+                    PortValue::new(
+                        "rd_idx".to_string(),
+                        format!("0b{:5b}", self.rd_idx.get_value()),
+                        [Ir_rd_idx_RegFile_rd_idx].into(),
+                    ),
+                    PortValue::new(
+                        "rd_data".to_string(),
+                        format!("0x{:X}", self.rd_data.get_value()),
+                        [RegFileMux_out_RegFile_rd_data].into(),
+                    ),
+                    PortValue::new(
+                        "rd_wr".to_string(),
+                        format!("0b{:1b}", self.rd_wr.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![
+                    PortValue::new(
+                        "rs1_data".to_string(),
+                        format!("0x{:X}", self.rs1_data.get_value()),
+                        [RegFile_rs1_data_Cmp_a, RegFile_rs1_data_AluMux1_rs1_data].into(),
+                    ),
+                    PortValue::new(
+                        "rs2_data".to_string(),
+                        format!("0x{:X}", self.rs2_data.get_value()),
+                        [
+                            RegFile_rs2_data_MwDR_rs2_data,
+                            RegFile_rs2_data_CmpMux_rs2_data,
+                            RegFile_rs2_data_AluMux2_rs2_data,
+                        ]
+                        .into(),
+                    ),
+                ],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(700.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}
+
+impl DatapathComponentDisplayer for RegFileMux {
+    fn get_datapath_component<'a>(
+        &self,
+        port_highlight_nets: &'a mut HashSet<DatapathNet>,
+    ) -> DatapathComponent<'a> {
+        DatapathComponent {
+            name: "RegFile Mux".to_string(),
+            values: PortValues::new(
+                vec![
+                    PortValue::new(
+                        "alu_out".to_string(),
+                        format!("0x{:X}", self.alu_out.get_value()),
+                        [Alu_out_RegFileMux_Alu_out].into(),
+                    ),
+                    PortValue::new(
+                        "cmp_out".to_string(),
+                        format!("0x{:X}", self.cmp_out.get_value()),
+                        [Cmp_out_RegFileMux_Cmp_out].into(),
+                    ),
+                    PortValue::new(
+                        "u_imm".to_string(),
+                        format!("0x{:X}", self.u_imm.get_value()),
+                        [Ir_u_imm_RegFileMux_u_imm].into(),
+                    ),
+                    PortValue::new(
+                        "mar".to_string(),
+                        format!("0x{:X}", self.mar.get_value()),
+                        [Mar_out_RegFileMux_mar].into(),
+                    ),
+                    PortValue::new(
+                        "mrdr".to_string(),
+                        format!("0x{:X}", self.mrdr.get_value()),
+                        [MrDr_out_RegFileMux_mrdr].into(),
+                    ),
+                    PortValue::new(
+                        "pc".to_string(),
+                        format!("0x{:X}", self.pc.get_value()),
+                        [Pc_out_RegFileMux_pc].into(),
+                    ),
+                    PortValue::new(
+                        "sel".to_string(),
+                        format!("0b{:3b}", self.sel.get_value()),
+                        [].into(),
+                    ),
+                ],
+                vec![PortValue::new(
+                    "out".to_string(),
+                    format!("0x{:X}", self.out.get_value()),
+                    [RegFileMux_out_RegFile_rd_data].into(),
+                )],
+            ),
+            port_highlight_nets,
+        }
+    }
+
+    fn get_frame_offset(&self) -> Pos2 {
+        Pos2::new(540.0, 120.0)
+    }
+
+    fn get_frame_size(&self) -> Vec2 {
+        Vec2::new(GLOBAL_FRAME_WIDTH, 25.0)
+    }
+}

@@ -1,0 +1,10 @@
+pub mod alu;
+pub mod cmp;
+pub mod control;
+pub mod ir;
+pub mod mar;
+pub mod mem_ctl;
+pub mod mrdr;
+pub mod mwdr;
+pub mod pc;
+pub mod regfile;
