@@ -22,7 +22,7 @@ enum AlignmentType {
 }
 
 pub struct Memory {
-    core: Arc<Mutex<Core>>,
+    core: Arc<Core>,
     offset: usize,
     offset_str: String,
     alignment_type: AlignmentType,
@@ -33,7 +33,7 @@ pub struct Memory {
 }
 
 impl Memory {
-    pub fn new(core: Arc<Mutex<Core>>, breakpoints: Arc<Mutex<BTreeSet<Word>>>) -> Memory {
+    pub fn new(core: Arc<Core>, breakpoints: Arc<Mutex<BTreeSet<Word>>>) -> Memory {
         Memory {
             core,
             offset: 0x40000000usize,
@@ -89,8 +89,7 @@ impl Memory {
                     let row_index =
                         Word::from((row.index() * byte_width as usize + self.offset) as u32);
                     let mut value = Word::unknown();
-                    let core = self.core.lock().unwrap();
-                    let memctl = core.mem_ctl.lock().unwrap();
+                    let memctl = self.core.mem_ctl.lock().unwrap();
                     for i in 0..byte_width {
                         let addr = row_index + Byte::from(i);
                         if let Some(byte_value) = memctl.backend_mem.get(&addr) {
@@ -167,10 +166,7 @@ impl Memory {
                     {
                         if let Some(load_file) = self.opened_file.clone() {
                             if let Ok(data) = fs::read(load_file) {
-                                self.core
-                                    .lock()
-                                    .unwrap()
-                                    .load_bin(&data, Word::from(load_file_addr as u32));
+                                self.core.load_bin(&data, Word::from(load_file_addr as u32));
                             }
                         }
                     } else {

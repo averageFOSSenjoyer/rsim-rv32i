@@ -20,8 +20,7 @@ pub struct Datapath {
 }
 
 impl Datapath {
-    pub fn new(core: Arc<Mutex<Core>>) -> Self {
-        let core = core.lock().unwrap();
+    pub fn new(core: Arc<Core>) -> Self {
         let mut datapath_component_displayers =
             HashMap::<ComponentType, Arc<Mutex<dyn DatapathComponentDisplayer>>>::new();
         datapath_component_displayers.insert(Alu, core.alu.clone());

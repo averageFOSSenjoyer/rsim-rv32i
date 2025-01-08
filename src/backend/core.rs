@@ -83,13 +83,13 @@ pub struct Core {
     pub mwdr: Arc<Mutex<Mwdr>>,
     pub keyboard_mmio_ctl: Arc<Mutex<KeyboardMmioCtl>>,
     pub vga_mmio_ctl: Arc<Mutex<VgaMmioCtl>>,
-    commit_file: Option<File>,
-    stats: HashMap<StatsType, u128>,
+    commit_file: Mutex<Option<File>>,
+    stats: Mutex<HashMap<StatsType, u128>>,
 }
 
 impl Core {
-    fn log_commits(&mut self) {
-        if let Some(commit_file) = self.commit_file.as_mut() {
+    fn log_commits(&self) {
+        if let Some(commit_file) = self.commit_file.lock().unwrap().as_mut() {
             // locking is fine here, we are not advancing the sim
             let control = self.control.lock().unwrap();
             let pc = self.pc.lock().unwrap();
@@ -184,7 +184,7 @@ impl Core {
             line.push('\n');
             commit_file.write_all(line.as_bytes()).unwrap();
 
-            let instructions_ran = self.stats[&InstructionsRan];
+            let instructions_ran = self.stats.lock().unwrap()[&InstructionsRan];
             if instructions_ran % 1000 == 0 {
                 println!("commit #{}", instructions_ran);
                 print!("{}", line);
@@ -192,24 +192,25 @@ impl Core {
         }
     }
 
-    pub fn run_cycle(&mut self) {
+    pub fn run_cycle(&self) {
         self.sim_manager.run_cycle().unwrap();
         self.sim_manager.run_cycle_end().unwrap();
         self.log_commits();
     }
 
-    pub fn run_instruction(&mut self) {
+    pub fn run_instruction(&self) {
         let old_pc = self.pc.lock().unwrap().data_inner;
 
         while !self.ir.lock().unwrap().can_end() && old_pc == self.pc.lock().unwrap().data_inner {
             self.run_cycle()
         }
 
-        self.stats
-            .insert(InstructionsRan, self.stats[&InstructionsRan] + 1);
+        let mut locked_stats = self.stats.lock().unwrap();
+        let instructions_ran = locked_stats[&InstructionsRan];
+        locked_stats.insert(InstructionsRan, instructions_ran + 1);
     }
 
-    pub fn run_until_addr(&mut self, addr: Arc<Mutex<BTreeSet<Word>>>) {
+    pub fn run_until_addr(&self, addr: Arc<Mutex<BTreeSet<Word>>>) {
         while !self.ir.lock().unwrap().can_end() {
             if addr
                 .lock()
@@ -222,17 +223,17 @@ impl Core {
         }
     }
 
-    pub fn run_end(&mut self) {
+    pub fn run_end(&self) {
         while !self.ir.lock().unwrap().can_end() {
             self.run_instruction()
         }
     }
 
-    pub fn load_bin(&mut self, data: &[u8], addr: Word) {
+    pub fn load_bin(&self, data: &[u8], addr: Word) {
         self.mem_ctl.lock().unwrap().load_bin(data, addr);
     }
 
-    pub fn reset(&mut self) {
+    pub fn reset(&self) {
         self.mem_ctl.lock().unwrap().reset();
         self.control.lock().unwrap().reset();
         self.ir.lock().unwrap().reset();
@@ -265,10 +266,10 @@ impl Core {
     pub fn new(threads_to_use: usize, commit_file: Option<File>) -> Self {
         let ack_channel = unbounded();
         let sim_manager = SimManager::new(ack_channel.1.clone());
-        let mut stats: HashMap<StatsType, u128> = Default::default();
+        let stats: Mutex<HashMap<StatsType, u128>> = Mutex::new(Default::default());
 
         for stats_type in StatsType::iter() {
-            stats.insert(stats_type, 0u128);
+            stats.lock().unwrap().insert(stats_type, 0u128);
         }
 
         // i swear there has to be a better way of doing this
@@ -643,7 +644,7 @@ impl Core {
             regfile,
             keyboard_mmio_ctl,
             vga_mmio_ctl,
-            commit_file,
+            commit_file: Mutex::new(commit_file),
             mwdr,
             stats,
         }

@@ -2,13 +2,13 @@ use crate::backend::core::Core;
 use crate::frontend::tab::Tab;
 use egui::{Context, Ui};
 use egui_extras::{Column, Size, StripBuilder, TableBuilder};
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 const NUM_ROWS: usize = 8;
 const NUM_COLUMNS: usize = 4;
 
 pub struct Register {
-    core: Arc<Mutex<Core>>,
+    core: Arc<Core>,
 }
 
 impl Tab for Register {
@@ -37,27 +37,26 @@ impl Tab for Register {
                 .show(ui, |ui| {
                     let mut size = ui.spacing().interact_size;
                     size.x = 90.0;
-                    let core = self.core.lock().unwrap();
 
                     ui.strong("State");
                     ui.add_sized(size, |ui: &mut Ui| {
                         ui.text_edit_singleline(&mut format!(
                             "{}",
-                            core.control.lock().unwrap().state.clone()
+                            self.core.control.lock().unwrap().state.clone()
                         ))
                     });
                     ui.strong("IR");
                     ui.add_sized(size, |ui: &mut Ui| {
                         ui.text_edit_singleline(&mut format!(
                             "{}",
-                            core.ir.lock().unwrap().data_inner.clone()
+                            self.core.ir.lock().unwrap().data_inner.clone()
                         ))
                     });
                     ui.strong("PC");
                     ui.add_sized(size, |ui: &mut Ui| {
                         ui.text_edit_singleline(&mut format!(
                             "{}",
-                            core.pc.lock().unwrap().data_inner.clone()
+                            self.core.pc.lock().unwrap().data_inner.clone()
                         ))
                     });
                     ui.end_row();
@@ -65,17 +64,17 @@ impl Tab for Register {
                     ui.strong("MAR");
                     ui.text_edit_singleline(&mut format!(
                         "{}",
-                        core.mar.lock().unwrap().data_inner.clone()
+                        self.core.mar.lock().unwrap().data_inner.clone()
                     ));
                     ui.strong("MrDR");
                     ui.text_edit_singleline(&mut format!(
                         "{}",
-                        core.mrdr.lock().unwrap().data_inner.clone()
+                        self.core.mrdr.lock().unwrap().data_inner.clone()
                     ));
                     ui.strong("MwDR");
                     ui.text_edit_singleline(&mut format!(
                         "{}",
-                        core.mwdr.lock().unwrap().data_inner.clone()
+                        self.core.mwdr.lock().unwrap().data_inner.clone()
                     ));
                     ui.end_row();
                 });
@@ -98,7 +97,7 @@ impl Tab for Register {
 }
 
 impl Register {
-    pub fn new(core: Arc<Mutex<Core>>) -> Self {
+    pub fn new(core: Arc<Core>) -> Self {
         Self { core }
     }
 
@@ -128,8 +127,7 @@ impl Register {
                         ui.strong(format!("x{}", reg_index));
                     });
 
-                    let core = self.core.lock().unwrap();
-                    let regfile = core.regfile.lock().unwrap();
+                    let regfile = self.core.regfile.lock().unwrap();
                     let reg_value = regfile.registers.data[reg_index];
                     row.col(|ui| {
                         ui.label(reg_value.to_string());

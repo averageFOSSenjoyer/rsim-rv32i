@@ -18,10 +18,10 @@ pub struct CoreApp {
 
 impl Default for CoreApp {
     fn default() -> Self {
-        let core = Arc::new(Mutex::new(Core::new(1, None)));
+        let core = Arc::new(Core::new(1, None));
         let breakpoints = Arc::new(Mutex::new(BTreeSet::new()));
-        let vga_mmio_ctl = core.lock().unwrap().vga_mmio_ctl.clone();
-        let keyboard_mmio_ctl = core.lock().unwrap().keyboard_mmio_ctl.clone();
+        let vga_mmio_ctl = core.vga_mmio_ctl.clone();
+        let keyboard_mmio_ctl = core.keyboard_mmio_ctl.clone();
 
         Self {
             widgets: vec![
@@ -79,7 +79,7 @@ impl CoreApp {
 
 impl eframe::App for CoreApp {
     fn update(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
-        let mut style =  (*ctx.style()).clone();
+        let mut style = (*ctx.style()).clone();
         style.interaction.tooltip_delay = 0.0;
         ctx.set_style(style);
         self.show_side_panel(ctx);

@@ -20,7 +20,6 @@ egui_file = "0.20.0"
 log = "0.4"
 wasm-bindgen-futures = "0.4.49"
 web-sys = "0.3.76"
-rand = "0.8.5"
 
 [dev-dependencies]
 rand = "0.8.5"
