@@ -1,5 +1,8 @@
 # rsim-rv32i: A cycle accurate multi-stage RV32i simulator
 ---
+## Demo
+Try out the WASM based demo [here](https://averagefossenjoyer.github.io/rsim-rv32i-demo/)
+
 ![](./figures/intro.png)
 
 ## Getting Started
