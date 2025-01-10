@@ -1,19 +1,16 @@
 <!DOCTYPE html>
-<html>
-<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-
-<!-- Disable zooming: -->
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-
+<html lang="en">
 <head>
-    <!-- change this to your project name -->
-    <title>eframe template</title>
-
+    <meta charset="utf-8" />
+    <link rel="icon" href="data:," />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>rsim_rv32i</title>
+    <base href="/" />
     <!-- config for our rust wasm binary. go to https://trunkrs.dev/assets/#rust for more customization -->
     
-<script type="module" nonce="GCMMf83I8YUUv0t+F2EYow==">
-import init, * as bindings from '/rsim_rv32i-45750a5dcb2e82c7.js';
-const wasm = await init({ module_or_path: '/rsim_rv32i-45750a5dcb2e82c7_bg.wasm' });
+<script type="module" nonce="dGGFi56whyz2IMV3dqbJPg==">
+import init, * as bindings from '/rsim_rv32i-8040f6fa9dd18dcf.js';
+const wasm = await init({ module_or_path: '/rsim_rv32i-8040f6fa9dd18dcf_bg.wasm' });
 
 
 window.wasmBindings = bindings;
@@ -22,11 +19,8 @@ window.wasmBindings = bindings;
 dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
 
 </script>
-    <!-- this is the base url relative to which other urls will be constructed. trunk will insert this from the public-url option -->
-    <base href="/" />
 
     <link rel="icon" href="/favicon-f402c8741ce815ec.ico" integrity="sha384&#x2D;jNOAE6jgE03LznIulCTVP6BH4NrTuROFjP9wj8bV1UUMJKtZAvstFpIAP3PDcFpx"/>
-
 
     
     
@@ -127,7 +121,7 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
             }
         }
     </style>
-<link rel="modulepreload" href="/rsim_rv32i-45750a5dcb2e82c7.js" crossorigin=anonymous integrity="sha384-5z2+55j1YyclxISFjrZ8V8JE7nUS/w0nKe/uALCcmZgOqNroac4ILic3kdqEg4c6"><link rel="preload" href="/rsim_rv32i-45750a5dcb2e82c7_bg.wasm" crossorigin=anonymous integrity="sha384-KpPfWnn/Wt4PAU5s6rViBnLGpe3mRrhqK4mc3Cg8WXi7d/xB931JiV8SZ/roenF7" as="fetch" type="application/wasm"></head>
+<link rel="modulepreload" href="/rsim_rv32i-8040f6fa9dd18dcf.js" crossorigin=anonymous integrity="sha384-6kAP4z528Fl6S2If3+DntPSuM2h1/d+0EtLQ1+HtHiJ4ur2pbVmjlgNh5e6mzpxd"><link rel="preload" href="/rsim_rv32i-8040f6fa9dd18dcf_bg.wasm" crossorigin=anonymous integrity="sha384-gSV5aRyQgy/sVKfx2Kazml+UsVWShzRQ/+JQoGlwkqYrXWloYvSz2Bld1iNe7OXz" as="fetch" type="application/wasm"></head>
 
 <body>
 <!-- The WASM code will resize the canvas dynamically -->
@@ -141,17 +135,6 @@ dispatchEvent(new CustomEvent("TrunkApplicationStarted", {detail: {wasm}}));
     </p>
     <div class="lds-dual-ring"></div>
 </div>
-
-<!--Register Service Worker. this will cache the wasm / js scripts for offline use (for PWA functionality). -->
-<!-- Force refresh (Ctrl + F5) to load the latest files instead of cached files  -->
-<script>
-    // We disable caching during development so that we always view the latest version.
-    if ('serviceWorker' in navigator && window.location.hash !== "#dev") {
-        window.addEventListener('load', function () {
-            navigator.serviceWorker.register('sw.js');
-        });
-    }
-</script>
 <script>"use strict";
 
 (function () {

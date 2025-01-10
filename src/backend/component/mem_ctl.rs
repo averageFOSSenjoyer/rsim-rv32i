@@ -190,8 +190,8 @@ impl KeyboardMmioCtl {
         }
     }
 
-    pub fn append_to_buffer(&mut self, data: &[u8]) {
-        self.buffer.extend(data);
+    pub fn append_to_buffer(&mut self, data: u8) {
+        self.buffer.push_back(data);
     }
 }
 

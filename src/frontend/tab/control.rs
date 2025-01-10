@@ -1,35 +1,23 @@
-use crate::backend::core::Core;
-use crate::backend::util::types::Word;
-use crate::frontend::tab::control::CoreCommand::{
-    Reset, RunCycle, RunEnd, RunInstructions, RunUntilAddr,
-};
+use crate::frontend::core_gui_wrapper::ControlCommand;
+use crate::frontend::core_gui_wrapper::ControlCommand::*;
 use crate::frontend::tab::Tab;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender};
 use egui::{Context, Ui};
-use std::collections::BTreeSet;
-use std::sync::{Arc, Mutex};
-use std::thread;
 
 pub struct Control {
-    breakpoints: Arc<Mutex<BTreeSet<Word>>>,
-    command_sender: Sender<CoreCommand>,
+    command_sender: Sender<ControlCommand>,
     ack_receiver: Receiver<()>,
     ready: bool,
 }
 
 impl Control {
-    pub fn new(core: Arc<Core>, breakpoints: Arc<Mutex<BTreeSet<Word>>>) -> Self {
-        let command_channel = unbounded();
-        let ack_channel = unbounded();
-        let core_wrapper = Arc::new(CoreWrapper::new(core));
-        thread::spawn(move || {
-            core_wrapper.thread_loop(command_channel.1.clone(), ack_channel.0.clone())
-        });
-
+    pub fn new(
+        command_sender: Sender<ControlCommand>,
+        ack_receiver: Receiver<()>,
+    ) -> Self {
         Control {
-            breakpoints,
-            command_sender: command_channel.0,
-            ack_receiver: ack_channel.1,
+            command_sender,
+            ack_receiver,
             ready: true,
         }
     }
@@ -61,7 +49,7 @@ impl Tab for Control {
                         core_command = Some(RunInstructions)
                     }
                     if ui.button("Next Breakpoint").clicked() {
-                        core_command = Some(RunUntilAddr(self.breakpoints.clone()))
+                        core_command = Some(RunUntilAddr)
                     }
                     if ui.button("Finish").clicked() {
                         core_command = Some(RunEnd)
@@ -80,49 +68,6 @@ impl Tab for Control {
         });
         if self.ack_receiver.try_recv().is_ok() {
             self.ready = true;
-        }
-    }
-}
-
-enum CoreCommand {
-    RunCycle,
-    RunInstructions,
-    RunUntilAddr(Arc<Mutex<BTreeSet<Word>>>),
-    RunEnd,
-    Reset,
-}
-
-struct CoreWrapper {
-    core: Arc<Core>,
-}
-
-impl CoreWrapper {
-    pub fn new(core: Arc<Core>) -> Self {
-        Self { core }
-    }
-
-    pub fn thread_loop(&self, command_receiver: Receiver<CoreCommand>, ack_sender: Sender<()>) {
-        loop {
-            if let Ok(command) = command_receiver.recv() {
-                match command {
-                    RunCycle => {
-                        self.core.run_cycle();
-                    }
-                    RunInstructions => {
-                        self.core.run_instruction();
-                    }
-                    RunUntilAddr(addr) => {
-                        self.core.run_until_addr(addr);
-                    }
-                    RunEnd => {
-                        self.core.run_end();
-                    }
-                    Reset => {
-                        self.core.reset();
-                    }
-                }
-                ack_sender.try_send(()).unwrap();
-            }
         }
     }
 }

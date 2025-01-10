@@ -1,16 +1,13 @@
-use crate::backend::core::Core;
+use std::future::Future;
 use crate::backend::util::byte::Bytes;
 use crate::backend::util::types::{Byte, Word};
 use crate::frontend::tab::Tab;
-use egui::{Context, Ui};
+use egui::{Context, Ui, Vec2};
 use egui_extras::Size;
 use egui_extras::TableBuilder;
 use egui_extras::{Column, StripBuilder};
-use egui_file::FileDialog;
-use std::collections::BTreeSet;
-use std::fs;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::collections::{BTreeMap, BTreeSet};
+use crossbeam_channel::{Receiver, Sender};
 
 const NUM_ROWS: usize = 0x200;
 
@@ -22,27 +19,34 @@ enum AlignmentType {
 }
 
 pub struct Memory {
-    core: Arc<Core>,
     offset: usize,
     offset_str: String,
     alignment_type: AlignmentType,
     load_file_addr_str: String,
-    opened_file: Option<PathBuf>,
-    open_file_dialog: Option<FileDialog>,
-    breakpoints: Arc<Mutex<BTreeSet<Word>>>,
+    breakpoints_sender: Sender<BTreeSet<Word>>,
+    breakpoints: BTreeSet<Word>,
+    memory_receiver: Receiver<BTreeMap<Word, Byte>>,
+    memory: BTreeMap<Word, Byte>,
+
+    load_bin_sender: Sender<(Vec<u8>, Word)>,
 }
 
 impl Memory {
-    pub fn new(core: Arc<Core>, breakpoints: Arc<Mutex<BTreeSet<Word>>>) -> Memory {
+    pub fn new(
+        breakpoints_sender: Sender<BTreeSet<Word>>,
+        memory_receiver: Receiver<BTreeMap<Word, Byte>>,
+        load_bin_sender: Sender<(Vec<u8>, Word)>,
+    ) -> Memory {
         Memory {
-            core,
             offset: 0x40000000usize,
             offset_str: "0x40000000".to_string(),
             alignment_type: AlignmentType::Word,
             load_file_addr_str: "0x40000000".to_string(),
-            opened_file: None,
-            open_file_dialog: None,
-            breakpoints,
+            breakpoints_sender,
+            breakpoints: BTreeSet::new(),
+            memory_receiver,
+            memory: BTreeMap::new(),
+            load_bin_sender,
         }
     }
 
@@ -89,10 +93,9 @@ impl Memory {
                     let row_index =
                         Word::from((row.index() * byte_width as usize + self.offset) as u32);
                     let mut value = Word::unknown();
-                    let memctl = self.core.mem_ctl.lock().unwrap();
                     for i in 0..byte_width {
                         let addr = row_index + Byte::from(i);
-                        if let Some(byte_value) = memctl.backend_mem.get(&addr) {
+                        if let Some(byte_value) = self.memory.get(&addr) {
                             value[i as usize] = (*byte_value).into();
                         }
                     }
@@ -120,70 +123,53 @@ impl Memory {
                     };
 
                     row.col(|ui| {
-                        let mut breakpoints = self.breakpoints.lock().unwrap();
-                        let mut has_breakpoint = breakpoints.contains(&row_index);
+                        let mut has_breakpoint = self.breakpoints.contains(&row_index);
                         ui.checkbox(&mut has_breakpoint, "");
                         if has_breakpoint {
-                            if !breakpoints.contains(&row_index) {
-                                breakpoints.insert(row_index);
+                            if !self.breakpoints.contains(&row_index) {
+                                self.breakpoints.insert(row_index);
                             }
                         } else {
-                            breakpoints.remove(&row_index);
+                            self.breakpoints.remove(&row_index);
                         }
+                        self.breakpoints_sender.try_send(self.breakpoints.clone()).unwrap();
                     });
                 });
             });
     }
 
-    fn file_picker_ui(&mut self, ctx: &Context, ui: &mut Ui) {
-        ui.vertical(|ui| {
-            ui.horizontal(|ui| {
-                ui.label("Load address: ");
-                ui.text_edit_singleline(&mut self.load_file_addr_str);
+    fn file_picker_ui(&mut self, _ctx: &Context, ui: &mut Ui) {
+        while let Ok(memory) = self.memory_receiver.try_recv() {
+            self.memory = memory;
+        }
+        ui.horizontal(|ui| {
+            ui.label("Load address: ");
+            ui.add_sized(Vec2::new(125.0, ui.available_height()), |ui: &mut Ui| {
+                ui.text_edit_singleline(&mut self.load_file_addr_str)
             });
-            ui.horizontal(|ui| {
-                ui.label("Load file: ");
-                let fname = self
-                    .opened_file
-                    .clone()
-                    .map(|f| f.into_os_string().into_string().unwrap())
-                    .unwrap_or("None chosen".to_string());
-                if fname.len() < 16 {
-                    ui.label(fname);
-                } else {
-                    ui.label(format!("...{}", &fname[fname.len() - 16..]));
-                }
-                if ui.button("Choose file").clicked() {
-                    let mut dialog = FileDialog::open_file(self.opened_file.clone());
-                    dialog.open();
-                    self.open_file_dialog = Some(dialog);
-                }
-                if ui.button("Load").clicked() {
-                    let trimmed_load_file_addr_str =
-                        self.load_file_addr_str.trim_start_matches("0x");
-                    if let Ok(load_file_addr) =
-                        usize::from_str_radix(trimmed_load_file_addr_str, 16)
-                    {
-                        if let Some(load_file) = self.opened_file.clone() {
-                            if let Ok(data) = fs::read(load_file) {
-                                self.core.load_bin(&data, Word::from(load_file_addr as u32));
-                            }
+            if ui.button("Load file").clicked() {
+                let trimmed_load_file_addr_str =
+                    self.load_file_addr_str.trim_start_matches("0x");
+                if let Ok(load_file_addr) =
+                    usize::from_str_radix(trimmed_load_file_addr_str, 16)
+                {
+                    let task = rfd::AsyncFileDialog::new().pick_file();
+                    let ctx = ui.ctx().clone();
+                    let load_bin_sender = self.load_bin_sender.clone();
+                    execute(async move {
+                        let file = task.await;
+                        if let Some(file) = file {
+                            let bytes = file.read().await;
+                            load_bin_sender.try_send((bytes, Word::from(load_file_addr as u32))).unwrap();
+                            ctx.request_repaint();
                         }
-                    } else {
-                        self.load_file_addr_str =
-                            format!("Failed to parse \"{}\"", self.load_file_addr_str).to_string();
-                    }
-                }
-            });
-        });
-
-        if let Some(dialog) = &mut self.open_file_dialog {
-            if dialog.show(ctx).selected() {
-                if let Some(file) = dialog.path() {
-                    self.opened_file = Some(file.to_path_buf());
+                    });
+                } else {
+                    self.load_file_addr_str =
+                        format!("Failed to parse \"{}\"", self.load_file_addr_str).to_string();
                 }
             }
-        }
+        });
     }
 }
 
@@ -240,7 +226,7 @@ impl Tab for Memory {
             StripBuilder::new(ui)
                 .size(Size::remainder())
                 .size(Size::exact(10.0))
-                .size(Size::exact(50.0))
+                .size(Size::exact(25.0))
                 .vertical(|mut strip| {
                     strip.cell(|ui| {
                         self.table_ui(ui);
@@ -255,3 +241,14 @@ impl Tab for Memory {
         });
     }
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+fn execute<F: Future<Output = ()> + Send + 'static>(f: F) {
+    std::thread::spawn(move || futures::executor::block_on(f));
+}
+
+#[cfg(target_arch = "wasm32")]
+fn execute<F: Future<Output = ()> + 'static>(f: F) {
+    wasm_bindgen_futures::spawn_local(f);
+}
+

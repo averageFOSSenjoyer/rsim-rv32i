@@ -21,16 +21,14 @@ fn main() {
 
 #[cfg(target_arch = "wasm32")]
 fn main() {
-    // until stable wasm threads
-    // compile_error!();
-
     use eframe::wasm_bindgen::JsCast as _;
-
-    eframe::WebLogger::init(log::LevelFilter::Debug).ok();
-
-    let web_options = eframe::WebOptions::default();
+    console_log::init().unwrap();
+    console_error_panic_hook::set_once();
+    eframe::WebLogger::init(log::LevelFilter::Trace).ok();
 
     wasm_bindgen_futures::spawn_local(async {
+        let web_options = eframe::WebOptions::default();
+
         let document = web_sys::window()
             .expect("No window")
             .document()
@@ -46,7 +44,7 @@ fn main() {
             .start(
                 canvas,
                 web_options,
-                Box::new(|cc| Ok(Box::new(frontend::core_app::CoreApp::new(cc)))),
+                Box::new(|cc| Ok(Box::new(CoreApp::new(cc)))),
             )
             .await;
 

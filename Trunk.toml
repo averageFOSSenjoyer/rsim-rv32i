@@ -1,0 +1,12 @@
+[build]
+target = "index.html"
+dist = "dist"
+
+[tools]
+wasm_opt = "version_119"
+
+[serve.headers]
+# see ./assets/_headers for more documentation
+"cross-origin-embedder-policy"= "require-corp"
+"cross-origin-opener-policy"= "same-origin"
+"cross-origin-resource-policy"= "same-site"

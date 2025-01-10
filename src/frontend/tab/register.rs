@@ -1,14 +1,15 @@
-use crate::backend::core::Core;
 use crate::frontend::tab::Tab;
 use egui::{Context, Ui};
 use egui_extras::{Column, Size, StripBuilder, TableBuilder};
-use std::sync::Arc;
+use crossbeam_channel::Receiver;
+use crate::frontend::core_gui_wrapper::RegisterData;
 
 const NUM_ROWS: usize = 8;
 const NUM_COLUMNS: usize = 4;
 
 pub struct Register {
-    core: Arc<Core>,
+    data_receiver: Receiver<RegisterData>,
+    data: Option<RegisterData>,
 }
 
 impl Tab for Register {
@@ -28,112 +29,99 @@ impl Tab for Register {
     }
 
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui) {
-        ui.vertical(|ui| {
-            ui.strong("Machine Registers");
-            ui.separator();
-            egui::Grid::new("mreg_grid")
-                .num_columns(3)
-                .striped(true)
-                .show(ui, |ui| {
-                    let mut size = ui.spacing().interact_size;
-                    size.x = 90.0;
+        while let Ok(data) = self.data_receiver.try_recv() {
+            self.data = Some(data);
+        }
+        if let Some(data) = &self.data {
+            ui.vertical(|ui| {
+                ui.strong("Machine Registers");
+                ui.separator();
+                egui::Grid::new("mreg_grid")
+                    .num_columns(3)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        let mut size = ui.spacing().interact_size;
+                        size.x = 90.0;
 
-                    ui.strong("State");
-                    ui.add_sized(size, |ui: &mut Ui| {
-                        ui.text_edit_singleline(&mut format!(
-                            "{}",
-                            self.core.control.lock().unwrap().state.clone()
-                        ))
+                        ui.strong("State");
+                        ui.add_sized(size, |ui: &mut Ui| {
+                            ui.text_edit_singleline(&mut data.state.clone())
+                        });
+                        ui.strong("IR");
+                        ui.add_sized(size, |ui: &mut Ui| {
+                            ui.text_edit_singleline(&mut data.ir.clone())
+                        });
+                        ui.strong("PC");
+                        ui.add_sized(size, |ui: &mut Ui| {
+                            ui.text_edit_singleline(&mut data.pc.clone())
+                        });
+                        ui.end_row();
+
+                        ui.strong("MAR");
+                        ui.text_edit_singleline(&mut data.mar.clone());
+                        ui.strong("MrDR");
+                        ui.text_edit_singleline(&mut data.mrdr.clone());
+                        ui.strong("MwDR");
+                        ui.text_edit_singleline(&mut data.mwdr.clone());
+                        ui.end_row();
                     });
-                    ui.strong("IR");
-                    ui.add_sized(size, |ui: &mut Ui| {
-                        ui.text_edit_singleline(&mut format!(
-                            "{}",
-                            self.core.ir.lock().unwrap().data_inner.clone()
-                        ))
-                    });
-                    ui.strong("PC");
-                    ui.add_sized(size, |ui: &mut Ui| {
-                        ui.text_edit_singleline(&mut format!(
-                            "{}",
-                            self.core.pc.lock().unwrap().data_inner.clone()
-                        ))
-                    });
-                    ui.end_row();
 
-                    ui.strong("MAR");
-                    ui.text_edit_singleline(&mut format!(
-                        "{}",
-                        self.core.mar.lock().unwrap().data_inner.clone()
-                    ));
-                    ui.strong("MrDR");
-                    ui.text_edit_singleline(&mut format!(
-                        "{}",
-                        self.core.mrdr.lock().unwrap().data_inner.clone()
-                    ));
-                    ui.strong("MwDR");
-                    ui.text_edit_singleline(&mut format!(
-                        "{}",
-                        self.core.mwdr.lock().unwrap().data_inner.clone()
-                    ));
-                    ui.end_row();
-                });
+                ui.separator();
 
-            ui.separator();
-
-            ui.strong("RegFile");
-            ui.separator();
-            StripBuilder::new(ui)
-                .size(Size::remainder().at_least(200.0))
-                .vertical(|mut strip| {
-                    strip.cell(|ui| {
-                        egui::ScrollArea::horizontal().show(ui, |ui| {
-                            self.rf_table_ui(ui);
+                ui.strong("RegFile");
+                ui.separator();
+                StripBuilder::new(ui)
+                    .size(Size::remainder().at_least(200.0))
+                    .vertical(|mut strip| {
+                        strip.cell(|ui| {
+                            egui::ScrollArea::horizontal().show(ui, |ui| {
+                                self.rf_table_ui(ui);
+                            });
                         });
                     });
-                });
-        });
+            });
+        }
     }
 }
 
 impl Register {
-    pub fn new(core: Arc<Core>) -> Self {
-        Self { core }
+    pub fn new(data_receiver: Receiver<RegisterData>) -> Self {
+        Self { data_receiver, data: None }
     }
 
-    fn rf_table_ui(&mut self, ui: &mut Ui) {
-        let text_height = egui::TextStyle::Body
-            .resolve(ui.style())
-            .size
-            .max(ui.spacing().interact_size.y);
+    fn rf_table_ui(&self, ui: &mut Ui) {
+        if let Some(data) = &self.data {
+            let text_height = egui::TextStyle::Body
+                .resolve(ui.style())
+                .size
+                .max(ui.spacing().interact_size.y);
 
-        let mut table = TableBuilder::new(ui)
-            .striped(true)
-            .resizable(false)
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .min_scrolled_height(0.0);
+            let mut table = TableBuilder::new(ui)
+                .striped(true)
+                .resizable(false)
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                .min_scrolled_height(0.0);
 
-        for _ in 0..2 * NUM_COLUMNS {
-            table = table.column(Column::auto());
+            for _ in 0..2 * NUM_COLUMNS {
+                table = table.column(Column::auto());
+            }
+
+            table.body(|body| {
+                body.rows(text_height, NUM_ROWS, |mut row| {
+                    let row_index = row.index();
+
+                    for col_index in 0..NUM_COLUMNS {
+                        let reg_index = row_index * NUM_COLUMNS + col_index;
+                        row.col(|ui| {
+                            ui.strong(format!("x{}", reg_index));
+                        });
+
+                        row.col(|ui| {
+                            ui.label(data.regfile[reg_index].clone());
+                        });
+                    }
+                })
+            });
         }
-
-        table.body(|body| {
-            body.rows(text_height, NUM_ROWS, |mut row| {
-                let row_index = row.index();
-
-                for col_index in 0..NUM_COLUMNS {
-                    let reg_index = row_index * NUM_COLUMNS + col_index;
-                    row.col(|ui| {
-                        ui.strong(format!("x{}", reg_index));
-                    });
-
-                    let regfile = self.core.regfile.lock().unwrap();
-                    let reg_value = regfile.registers.data[reg_index];
-                    row.col(|ui| {
-                        ui.label(reg_value.to_string());
-                    });
-                }
-            })
-        });
     }
 }
