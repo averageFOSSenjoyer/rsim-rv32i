@@ -175,7 +175,7 @@ impl Memory {
 
 impl Tab for Memory {
     fn name(&self) -> &'static str {
-        "Memory"
+        "☰ Memory"
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {

@@ -14,7 +14,7 @@ pub struct Register {
 
 impl Tab for Register {
     fn name(&self) -> &'static str {
-        "Register"
+        "▣ Register"
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {

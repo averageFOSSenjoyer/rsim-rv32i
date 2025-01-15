@@ -6,6 +6,7 @@ pub mod datapath;
 pub mod memory;
 pub mod register;
 pub mod setting;
+pub mod about;
 
 pub trait Tab {
     fn name(&self) -> &'static str;

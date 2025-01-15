@@ -25,7 +25,7 @@ impl Control {
 
 impl Tab for Control {
     fn name(&self) -> &'static str {
-        "Control"
+        "🖮 Control"
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {

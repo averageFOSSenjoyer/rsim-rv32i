@@ -1,3 +1,4 @@
+use crate::frontend::tab::about::About;
 use crate::frontend::tab::register::Register;
 use crate::backend::core::Core;
 use crate::frontend::tab::console::Console;
@@ -57,7 +58,8 @@ impl Default for CoreApp {
                 Box::new(Register::new(register_data_channel.1.clone())),
                 Box::new(Datapath::new(datapath_component_channel.1.clone())),
                 Box::new(Console::new(console_vga_buffer_channel.1.clone(), console_keyboard_buffer_channel.0.clone())),
-                Box::new(Setting::new()),
+                Box::new(Setting::default()),
+                Box::new(About {})
             ],
             opened_widget_by_name: Default::default(),
         }
@@ -70,7 +72,10 @@ impl CoreApp {
     }
 
     fn show_side_panel(&mut self, ctx: &egui::Context) {
-        egui::SidePanel::left("side_panel").show(ctx, |ui| {
+        egui::SidePanel::left("side_panel")
+            .resizable(false)
+            .default_width(125.0)
+            .show(ctx, |ui| {
             ScrollArea::vertical().show(ui, |ui| {
                 ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
                     let opened_widget_by_name = &mut self.opened_widget_by_name;

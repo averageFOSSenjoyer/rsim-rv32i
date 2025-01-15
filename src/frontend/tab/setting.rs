@@ -6,15 +6,15 @@ pub struct Setting {
     scaling: f32,
 }
 
-impl Setting {
-    pub fn new() -> Self {
-        Setting { scaling: 1.25 }
+impl Default for Setting {
+    fn default() -> Self {
+        Self { scaling: 1.25 }
     }
 }
 
 impl Tab for Setting {
     fn name(&self) -> &'static str {
-        "Setting"
+        "🔧 Setting"
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {

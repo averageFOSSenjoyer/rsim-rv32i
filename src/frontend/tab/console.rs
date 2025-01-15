@@ -37,7 +37,7 @@ impl Console {
 
 impl Tab for Console {
     fn name(&self) -> &'static str {
-        "Console"
+        "🗖 Console"
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {

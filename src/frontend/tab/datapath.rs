@@ -31,7 +31,7 @@ impl Datapath {
 
 impl Tab for Datapath {
     fn name(&self) -> &'static str {
-        "Datapath"
+        "✨ Datapath"
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {
