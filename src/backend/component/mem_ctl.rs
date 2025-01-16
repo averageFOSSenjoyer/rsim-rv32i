@@ -168,13 +168,15 @@ impl MemCtl {
                     }
                 }
             }
-            // text
-            if let Ok(Some(text_section_header)) = elf_bytes.section_header_by_name(".text") {
-                if let Ok((text_data, _)) = elf_bytes.section_data(&text_section_header) {
-                    let addr = Word::from(text_section_header.sh_addr as u32);
-                    for i in 0..text_data.len() as u32 {
-                        self.backend_mem
-                            .insert(addr + Word::from(i), text_data[i as usize].into());
+            // sections
+            if let Some(section_table) = elf_bytes.section_headers() {
+                for section_header in section_table.iter() {
+                    if let Ok((section_data, _)) = elf_bytes.section_data(&section_header) {
+                        let addr = Word::from(section_header.sh_addr as u32);
+                        for i in 0..section_data.len() as u32 {
+                            self.backend_mem
+                                .insert(addr + Word::from(i), section_data[i as usize].into());
+                        }
                     }
                 }
             }
