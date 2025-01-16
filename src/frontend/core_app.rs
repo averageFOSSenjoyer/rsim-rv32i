@@ -32,7 +32,8 @@ impl Default for CoreApp {
         let register_data_channel = unbounded();
         let breakpoint_channel = unbounded();
         let memory_channel = unbounded();
-        let load_bin_channel = unbounded();
+        let label_channel = unbounded();
+        let load_elf_channel = unbounded();
         let datapath_component_channel = unbounded();
         let mut core_wrapper = CoreGuiWrapper::new(
             core.clone(),
@@ -43,7 +44,8 @@ impl Default for CoreApp {
             register_data_channel.0.clone(),
             breakpoint_channel.1.clone(),
             memory_channel.0.clone(),
-            load_bin_channel.1.clone(),
+            label_channel.0.clone(),
+            load_elf_channel.1.clone(),
             datapath_component_channel.0.clone(),
         );
 
@@ -54,7 +56,7 @@ impl Default for CoreApp {
         Self {
             widgets: vec![
                 Box::new(Control::new(control_command_channel.0.clone(), control_ack_channel.1.clone())),
-                Box::new(Memory::new(breakpoint_channel.0.clone(), memory_channel.1.clone(), load_bin_channel.0.clone())),
+                Box::new(Memory::new(breakpoint_channel.0.clone(), memory_channel.1.clone(), label_channel.1.clone(), load_elf_channel.0.clone())),
                 Box::new(Register::new(register_data_channel.1.clone())),
                 Box::new(Datapath::new(datapath_component_channel.1.clone())),
                 Box::new(Console::new(console_vga_buffer_channel.1.clone(), console_keyboard_buffer_channel.0.clone())),

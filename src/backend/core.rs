@@ -236,8 +236,8 @@ impl Core {
         }
     }
 
-    pub fn load_bin(&self, data: &[u8], addr: Word) {
-        self.mem_ctl.lock().unwrap().load_bin(data, addr);
+    pub fn load_elf(&self, data: &[u8]) {
+        self.mem_ctl.lock().unwrap().load_elf(data);
     }
 
     pub fn reset(&self) {

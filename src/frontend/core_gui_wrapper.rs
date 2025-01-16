@@ -24,7 +24,8 @@ pub struct CoreGuiWrapper {
     breakpoints_receiver: Receiver<BTreeSet<Word>>,
     breakpoints: BTreeSet<Word>,
     memory_sender: Sender<BTreeMap<Word, Byte>>,
-    load_bin_receiver: Receiver<(Vec<u8>, Word)>,
+    label_sender: Sender<BTreeMap<Word, String>>,
+    load_elf_receiver: Receiver<Vec<u8>>,
     datapath_component_sender: Sender<DatapathComponentMap>,
 }
 
@@ -38,7 +39,8 @@ impl CoreGuiWrapper {
         register_data_sender: Sender<RegisterData>,
         breakpoints_receiver: Receiver<BTreeSet<Word>>,
         memory_sender: Sender<BTreeMap<Word, Byte>>,
-        load_bin_receiver: Receiver<(Vec<u8>, Word)>,
+        label_sender: Sender<BTreeMap<Word, String>>,
+        load_elf_receiver: Receiver<Vec<u8>>,
         datapath_component_sender: Sender<DatapathComponentMap>,
     ) -> Self {
         Self {
@@ -51,7 +53,8 @@ impl CoreGuiWrapper {
             breakpoints_receiver,
             breakpoints: Default::default(),
             memory_sender,
-            load_bin_receiver,
+            label_sender,
+            load_elf_receiver,
             datapath_component_sender,
         }
     }
@@ -91,6 +94,7 @@ impl CoreGuiWrapper {
         self.register_data_sender.try_send(register_data).unwrap();
 
         self.memory_sender.try_send(self.core.mem_ctl.lock().unwrap().backend_mem.clone()).unwrap();
+        self.label_sender.try_send(self.core.mem_ctl.lock().unwrap().label.clone()).unwrap();
 
         let mut datapath_components = DatapathComponentMap::default();
         datapath_components.insert(Alu, self.core.alu.lock().unwrap().get_datapath_component());
@@ -142,8 +146,8 @@ impl CoreGuiWrapper {
             if let Ok(byte) = self.console_keyboard_buffer_receiver.try_recv() {
                 self.core.keyboard_mmio_ctl.lock().unwrap().append_to_buffer(byte);
             }
-            if let Ok((data, addr)) = self.load_bin_receiver.try_recv() {
-                self.core.load_bin(data.as_slice(), addr);
+            if let Ok(data) = self.load_elf_receiver.try_recv() {
+                self.core.load_elf(data.as_slice());
                 self.send_update();
             }
         }

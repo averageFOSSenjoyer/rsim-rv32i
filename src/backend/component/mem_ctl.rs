@@ -13,6 +13,8 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
+use elf::ElfBytes;
+use elf::endian::LittleEndian;
 
 #[ComponentAttribute({
 "port": {
@@ -35,6 +37,7 @@ use std::sync::{Arc, Mutex};
 #[allow(dead_code)]
 pub struct MemCtl {
     pub backend_mem: BTreeMap<Word, Byte>,
+    pub label: BTreeMap<Word, String>,
     mmio_ctl: HashMap<Range<u32>, Arc<Mutex<dyn MmioCtl>>>,
     is_busy: bool,
 }
@@ -57,6 +60,7 @@ impl MemCtl {
 
         MemCtl {
             backend_mem: Default::default(),
+            label: Default::default(),
             mmio_ctl: Default::default(),
             is_busy: false,
             component_id,
@@ -79,6 +83,7 @@ impl MemCtl {
 
     fn reset_impl(&mut self) {
         self.backend_mem.clear();
+        self.label.clear();
         self.mmio_ctl.clear();
     }
 
@@ -151,11 +156,29 @@ impl MemCtl {
 
     fn on_comb(&mut self) {}
 
-    pub fn load_bin(&mut self, data: &[u8], addr: Word) {
-        for i in 0..data.len() as u32 {
-            self.backend_mem
-                .insert(addr + Word::from(i), data[i as usize].into());
-        }
+    pub fn load_elf(&mut self, data: &[u8]) {
+        ElfBytes::<LittleEndian>::minimal_parse(data).map(|elf_bytes| {
+            // symbol table
+            if let Ok(Some((symbol_table, string_table))) = elf_bytes.symbol_table() {
+                for symbol in symbol_table.iter() {
+                    if symbol.st_name != 0 {
+                        if let Ok(symbol_name) = string_table.get(symbol.st_name as usize) {
+                            self.label.insert(Word::from(symbol.st_value as u32), symbol_name.to_string());
+                        }
+                    }
+                }
+            }
+            // text
+            if let Ok(Some(text_section_header)) = elf_bytes.section_header_by_name(".text") {
+                if let Ok((text_data, _)) = elf_bytes.section_data(&text_section_header) {
+                    let addr = Word::from(text_section_header.sh_addr as u32);
+                    for i in 0..text_data.len() as u32 {
+                        self.backend_mem
+                            .insert(addr + Word::from(i), text_data[i as usize].into());
+                    }
+                }
+            }
+        }).unwrap_or_else(|_| println!("Failed to parse ELF file"));
     }
 }
 

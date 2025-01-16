@@ -26,6 +26,7 @@ log = "0.4.22"
 rfd = "0.13"
 futures = "0.3.31"
 web-time = "1.1.0"
+elf = "0.7.4"
 
 [dev-dependencies]
 rand = "0.8.5"

@@ -2,7 +2,7 @@ use std::future::Future;
 use crate::backend::util::byte::Bytes;
 use crate::backend::util::types::{Byte, Word};
 use crate::frontend::tab::Tab;
-use egui::{Context, Ui, Vec2};
+use egui::{Context, Ui};
 use egui_extras::Size;
 use egui_extras::TableBuilder;
 use egui_extras::{Column, StripBuilder};
@@ -22,31 +22,33 @@ pub struct Memory {
     offset: usize,
     offset_str: String,
     alignment_type: AlignmentType,
-    load_file_addr_str: String,
     breakpoints_sender: Sender<BTreeSet<Word>>,
     breakpoints: BTreeSet<Word>,
     memory_receiver: Receiver<BTreeMap<Word, Byte>>,
     memory: BTreeMap<Word, Byte>,
-
-    load_bin_sender: Sender<(Vec<u8>, Word)>,
+    label_receiver: Receiver<BTreeMap<Word, String>>,
+    label: BTreeMap<Word, String>,
+    load_elf_sender: Sender<Vec<u8>>,
 }
 
 impl Memory {
     pub fn new(
         breakpoints_sender: Sender<BTreeSet<Word>>,
         memory_receiver: Receiver<BTreeMap<Word, Byte>>,
-        load_bin_sender: Sender<(Vec<u8>, Word)>,
+        label_receiver: Receiver<BTreeMap<Word, String>>,
+        load_elf_sender: Sender<Vec<u8>>,
     ) -> Memory {
         Memory {
             offset: 0x40000000usize,
             offset_str: "0x40000000".to_string(),
             alignment_type: AlignmentType::Word,
-            load_file_addr_str: "0x40000000".to_string(),
             breakpoints_sender,
             breakpoints: BTreeSet::new(),
             memory_receiver,
             memory: BTreeMap::new(),
-            load_bin_sender,
+            label_receiver,
+            label: BTreeMap::new(),
+            load_elf_sender,
         }
     }
 
@@ -62,10 +64,14 @@ impl Memory {
             .animate_scrolling(true)
             .column(Column::auto().at_least(100.0))
             .column(Column::auto().at_least(100.0))
+            .column(Column::auto().at_least(100.0))
             .column(Column::auto().at_least(90.0));
 
         table
             .header(20.0, |mut header| {
+                header.col(|ui| {
+                    ui.strong("Label");
+                });
                 header.col(|ui| {
                     egui::Sides::new().show(
                         ui,
@@ -99,6 +105,12 @@ impl Memory {
                             value[i as usize] = (*byte_value).into();
                         }
                     }
+
+                    row.col(|ui| {
+                        if let Some(label) = self.label.get(&row_index) {
+                            ui.label(label);
+                        }
+                    });
 
                     row.col(|ui| {
                         ui.label(format!("{}", row_index));
@@ -139,35 +151,19 @@ impl Memory {
     }
 
     fn file_picker_ui(&mut self, _ctx: &Context, ui: &mut Ui) {
-        while let Ok(memory) = self.memory_receiver.try_recv() {
-            self.memory = memory;
-        }
         ui.horizontal(|ui| {
-            ui.label("Load address: ");
-            ui.add_sized(Vec2::new(125.0, ui.available_height()), |ui: &mut Ui| {
-                ui.text_edit_singleline(&mut self.load_file_addr_str)
-            });
-            if ui.button("Load file").clicked() {
-                let trimmed_load_file_addr_str =
-                    self.load_file_addr_str.trim_start_matches("0x");
-                if let Ok(load_file_addr) =
-                    usize::from_str_radix(trimmed_load_file_addr_str, 16)
-                {
-                    let task = rfd::AsyncFileDialog::new().pick_file();
-                    let ctx = ui.ctx().clone();
-                    let load_bin_sender = self.load_bin_sender.clone();
-                    execute(async move {
-                        let file = task.await;
-                        if let Some(file) = file {
-                            let bytes = file.read().await;
-                            load_bin_sender.try_send((bytes, Word::from(load_file_addr as u32))).unwrap();
-                            ctx.request_repaint();
-                        }
-                    });
-                } else {
-                    self.load_file_addr_str =
-                        format!("Failed to parse \"{}\"", self.load_file_addr_str).to_string();
-                }
+            if ui.button("Load ELF").clicked() {
+                let task = rfd::AsyncFileDialog::new().pick_file();
+                let ctx = ui.ctx().clone();
+                let load_bin_sender = self.load_elf_sender.clone();
+                execute(async move {
+                    let file = task.await;
+                    if let Some(file) = file {
+                        let bytes = file.read().await;
+                        load_bin_sender.try_send(bytes).unwrap();
+                        ctx.request_repaint();
+                    }
+                });
             }
         });
     }
@@ -190,6 +186,12 @@ impl Tab for Memory {
     }
 
     fn ui(&mut self, ctx: &Context, ui: &mut Ui) {
+        while let Ok(memory) = self.memory_receiver.try_recv() {
+            self.memory = memory;
+        }
+        while let Ok(label) = self.label_receiver.try_recv() {
+            self.label = label;
+        }
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label("Memory Address: ");

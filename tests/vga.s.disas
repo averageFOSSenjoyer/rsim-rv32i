@@ -7,18 +7,17 @@ Disassembly of section .text:
 40000000 <_start>:
 40000000:	000b80b7          	lui	ra,0xb8
 40000004:	00000113          	li	sp,0
-40000008:	000011b7          	lui	gp,0x1
-4000000c:	fa018193          	addi	gp,gp,-96 # fa0 <_start-0x3ffff060>
+40000008:	7d000193          	li	gp,2000
 
-40000010 <loop>:
-40000010:	00317a63          	bgeu	sp,gp,40000024 <halt>
-40000014:	00208023          	sb	sp,0(ra) # b8000 <_start-0x3ff48000>
-40000018:	00208093          	addi	ra,ra,2
-4000001c:	00210113          	addi	sp,sp,2
-40000020:	ff1ff06f          	j	40000010 <loop>
+4000000c <loop>:
+4000000c:	00317a63          	bgeu	sp,gp,40000020 <halt>
+40000010:	00208023          	sb	sp,0(ra) # b8000 <_start-0x3ff48000>
+40000014:	00208093          	addi	ra,ra,2
+40000018:	00110113          	addi	sp,sp,1
+4000001c:	ff1ff06f          	j	4000000c <loop>
 
-40000024 <halt>:
-40000024:	f0002013          	slti	zero,zero,-256
+40000020 <halt>:
+40000020:	f0002013          	slti	zero,zero,-256
 
 Disassembly of section .riscv.attributes:
 
