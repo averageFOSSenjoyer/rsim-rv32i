@@ -1,13 +1,13 @@
 [package]
 name = "rsim_rv32i"
 version = "1.0.0-beta.2"
-edition = "2021"
+edition = "2024"
 
 [dependencies]
 rsim_core = { git = "ssh://git@github.com:22/averageFOSSenjoyer/rsim-core.git" }
 rsim_macro = { git = "ssh://git@github.com:22/averageFOSSenjoyer/rsim-macro.git" }
 crossbeam-channel = "=0.5.14"
-strum = {version = "=0.25.0", features = ["derive"] }
+strum = {version = "=0.26.3", features = ["derive"] }
 egui = "0.30"
 eframe = { version = "0.30", default-features = false, features = [
     "accesskit",     # Make egui compatible with screen readers. NOTE: adds a lot of dependencies.
@@ -17,13 +17,13 @@ eframe = { version = "0.30", default-features = false, features = [
 ] }
 egui_extras = "0.30.0"
 wasm_thread = "0.3.0"
-wasm-bindgen = "0.2.99"
-wasm-bindgen-futures = "0.4.49"
-web-sys = "0.3.76"
+wasm-bindgen = "0.2.100"
+wasm-bindgen-futures = "0.4.50"
+web-sys = "0.3.77"
 console_error_panic_hook = "0.1.7"
 console_log = { version = "1.0.0", features = ["color"] }
-log = "0.4.22"
-rfd = "0.13"
+log = "0.4.25"
+rfd = "0.15.2"
 futures = "0.3.31"
 web-time = "1.1.0"
 elf = "0.7.4"
