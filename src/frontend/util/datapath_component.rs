@@ -7,14 +7,14 @@ use crate::backend::component::mrdr::Mrdr;
 use crate::backend::component::mwdr::Mwdr;
 use crate::backend::component::pc::{Pc, PcMux};
 use crate::backend::component::regfile::{RegFile, RegFileMux};
-use crate::frontend::util::datapath_net::{DatapathNet, DatapathNetDispalyer};
+use crate::backend::core::ComponentType;
 use crate::frontend::util::datapath_net::DatapathNet::*;
+use crate::frontend::util::datapath_net::{DatapathNet, DatapathNetDispalyer};
 use eframe::emath::Align;
+use egui::epaint::{PathShape, PathStroke};
 use egui::{Color32, Frame, Painter, Response, Stroke, Ui, Widget};
 use egui::{Layout, Pos2, Vec2};
 use std::collections::HashSet;
-use egui::epaint::{PathShape, PathStroke};
-use crate::backend::core::ComponentType;
 
 #[derive(Debug, Clone)]
 pub struct PortValue {
@@ -160,15 +160,11 @@ impl ComponentType {
 }
 
 pub trait DatapathComponentDisplayer {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent;
+    fn get_datapath_component(&self) -> DatapathComponent;
 }
 
 impl DatapathComponentDisplayer for Alu {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "ALU".to_string(),
             values: PortValues::new(
@@ -200,9 +196,7 @@ impl DatapathComponentDisplayer for Alu {
 }
 
 impl DatapathComponentDisplayer for AluMux1 {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "ALU Mux 1".to_string(),
             values: PortValues::new(
@@ -234,9 +228,7 @@ impl DatapathComponentDisplayer for AluMux1 {
 }
 
 impl DatapathComponentDisplayer for AluMux2 {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "ALU Mux 2".to_string(),
             values: PortValues::new(
@@ -288,9 +280,7 @@ impl DatapathComponentDisplayer for AluMux2 {
 }
 
 impl DatapathComponentDisplayer for CmpMux {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "CMP Mux".to_string(),
             values: PortValues::new(
@@ -322,9 +312,7 @@ impl DatapathComponentDisplayer for CmpMux {
 }
 
 impl DatapathComponentDisplayer for Cmp {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "CMP".to_string(),
             values: PortValues::new(
@@ -356,9 +344,7 @@ impl DatapathComponentDisplayer for Cmp {
 }
 
 impl DatapathComponentDisplayer for IR {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "IR".to_string(),
             values: PortValues::new(
@@ -437,9 +423,7 @@ impl DatapathComponentDisplayer for IR {
 }
 
 impl DatapathComponentDisplayer for Mar {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "MAR".to_string(),
             values: PortValues::new(
@@ -471,9 +455,7 @@ impl DatapathComponentDisplayer for Mar {
 }
 
 impl DatapathComponentDisplayer for MarMux {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "MAR Mux".to_string(),
             values: PortValues::new(
@@ -505,9 +487,7 @@ impl DatapathComponentDisplayer for MarMux {
 }
 
 impl DatapathComponentDisplayer for MemCtl {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "MemCtl".to_string(),
             values: PortValues::new(
@@ -561,9 +541,7 @@ impl DatapathComponentDisplayer for MemCtl {
 }
 
 impl DatapathComponentDisplayer for Mrdr {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "MrDR".to_string(),
             values: PortValues::new(
@@ -590,9 +568,7 @@ impl DatapathComponentDisplayer for Mrdr {
 }
 
 impl DatapathComponentDisplayer for Mwdr {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "MwDR".to_string(),
             values: PortValues::new(
@@ -624,9 +600,7 @@ impl DatapathComponentDisplayer for Mwdr {
 }
 
 impl DatapathComponentDisplayer for Pc {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "PC".to_string(),
             values: PortValues::new(
@@ -659,9 +633,7 @@ impl DatapathComponentDisplayer for Pc {
 }
 
 impl DatapathComponentDisplayer for PcMux {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "PC Mux".to_string(),
             values: PortValues::new(
@@ -693,9 +665,7 @@ impl DatapathComponentDisplayer for PcMux {
 }
 
 impl DatapathComponentDisplayer for RegFile {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "RegFile".to_string(),
             values: PortValues::new(
@@ -749,9 +719,7 @@ impl DatapathComponentDisplayer for RegFile {
 }
 
 impl DatapathComponentDisplayer for RegFileMux {
-    fn get_datapath_component(
-        &self
-    ) -> DatapathComponent {
+    fn get_datapath_component(&self) -> DatapathComponent {
         DatapathComponent {
             name: "RegFile Mux".to_string(),
             values: PortValues::new(

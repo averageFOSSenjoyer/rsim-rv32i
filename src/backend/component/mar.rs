@@ -1,7 +1,7 @@
 use crate::backend::util::types::Byte;
-use crate::backend::util::types::{mux_sel, Word};
-use crossbeam_channel::unbounded;
+use crate::backend::util::types::{Word, mux_sel};
 use crossbeam_channel::Sender;
+use crossbeam_channel::unbounded;
 use rsim_core::component::Component;
 use rsim_core::rx::Rx;
 use rsim_core::sim_manager::SimManager;

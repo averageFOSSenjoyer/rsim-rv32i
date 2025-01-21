@@ -1,13 +1,13 @@
-use std::future::Future;
 use crate::backend::util::byte::Bytes;
 use crate::backend::util::types::{Byte, Word};
 use crate::frontend::tab::Tab;
+use crossbeam_channel::{Receiver, Sender};
 use egui::{Context, Ui};
 use egui_extras::Size;
 use egui_extras::TableBuilder;
 use egui_extras::{Column, StripBuilder};
 use std::collections::{BTreeMap, BTreeSet};
-use crossbeam_channel::{Receiver, Sender};
+use std::future::Future;
 
 const NUM_ROWS: usize = 0x200;
 
@@ -144,7 +144,9 @@ impl Memory {
                         } else {
                             self.breakpoints.remove(&row_index);
                         }
-                        self.breakpoints_sender.try_send(self.breakpoints.clone()).unwrap();
+                        self.breakpoints_sender
+                            .try_send(self.breakpoints.clone())
+                            .unwrap();
                     });
                 });
             });
@@ -253,4 +255,3 @@ fn execute<F: Future<Output = ()> + Send + 'static>(f: F) {
 fn execute<F: Future<Output = ()> + 'static>(f: F) {
     wasm_bindgen_futures::spawn_local(f);
 }
-

@@ -1,6 +1,6 @@
 use crate::backend::util::types::States::*;
 use crate::backend::util::types::*;
-use crossbeam_channel::{unbounded, Sender};
+use crossbeam_channel::{Sender, unbounded};
 use rsim_core::component::Component;
 use rsim_core::rx::Rx;
 use rsim_core::sim_manager::SimManager;

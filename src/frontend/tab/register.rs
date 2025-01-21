@@ -1,8 +1,8 @@
+use crate::frontend::core_gui_wrapper::RegisterData;
 use crate::frontend::tab::Tab;
+use crossbeam_channel::Receiver;
 use egui::{Context, Ui};
 use egui_extras::{Column, Size, StripBuilder, TableBuilder};
-use crossbeam_channel::Receiver;
-use crate::frontend::core_gui_wrapper::RegisterData;
 
 const NUM_ROWS: usize = 8;
 const NUM_COLUMNS: usize = 4;
@@ -86,7 +86,10 @@ impl Tab for Register {
 
 impl Register {
     pub fn new(data_receiver: Receiver<RegisterData>) -> Self {
-        Self { data_receiver, data: None }
+        Self {
+            data_receiver,
+            data: None,
+        }
     }
 
     fn rf_table_ui(&self, ui: &mut Ui) {

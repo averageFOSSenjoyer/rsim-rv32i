@@ -1,7 +1,7 @@
 use crate::backend::util::byte::Bytes;
 use crate::backend::util::helper::sign_extend;
 use crate::backend::util::types::*;
-use crossbeam_channel::{unbounded, Sender};
+use crossbeam_channel::{Sender, unbounded};
 use rsim_core::component::Component;
 use rsim_core::rx::Rx;
 use rsim_core::sim_manager::SimManager;
@@ -130,7 +130,16 @@ impl RegFile {
 
 impl Debug for RegFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RegFile: {{rd_wr: {:?}, rd_idx: {:?}, rd_data: {:?}, rs1_idx: {:?}, rs2_idx: {:?}, data: {:?}}}", self.rd_wr.get_value(), self.rd_idx.get_value(), self.rd_data.get_value(), self.rs1_idx.get_value(), self.rs2_idx.get_value(), self.registers)
+        write!(
+            f,
+            "RegFile: {{rd_wr: {:?}, rd_idx: {:?}, rd_data: {:?}, rs1_idx: {:?}, rs2_idx: {:?}, data: {:?}}}",
+            self.rd_wr.get_value(),
+            self.rd_idx.get_value(),
+            self.rd_data.get_value(),
+            self.rs1_idx.get_value(),
+            self.rs2_idx.get_value(),
+            self.registers
+        )
     }
 }
 
@@ -239,6 +248,16 @@ impl RegFileMux {
 
 impl Debug for RegFileMux {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "RegFileMux: {{alu_out: {:?}, cmp_out: {:?}, u_imm: {:?}, mar: {:?} mrdr: {:?} pc: {:?} sel: {:?}}}", self.alu_out.get_value(), self.cmp_out.get_value(), self.u_imm.get_value(), self.mar.get_value(), self.mrdr.get_value(), self.pc.get_value(), self.sel.get_value())
+        write!(
+            f,
+            "RegFileMux: {{alu_out: {:?}, cmp_out: {:?}, u_imm: {:?}, mar: {:?} mrdr: {:?} pc: {:?} sel: {:?}}}",
+            self.alu_out.get_value(),
+            self.cmp_out.get_value(),
+            self.u_imm.get_value(),
+            self.mar.get_value(),
+            self.mrdr.get_value(),
+            self.pc.get_value(),
+            self.sel.get_value()
+        )
     }
 }

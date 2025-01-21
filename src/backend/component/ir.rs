@@ -1,7 +1,7 @@
 use crate::backend::util::helper::sign_extend;
 use crate::backend::util::types::Byte;
 use crate::backend::util::types::Word;
-use crossbeam_channel::{unbounded, Sender};
+use crossbeam_channel::{Sender, unbounded};
 use rsim_core::component::Component;
 use rsim_core::rx::Rx;
 use rsim_core::sim_manager::SimManager;

@@ -1,21 +1,21 @@
-use crate::frontend::tab::about::About;
-use crate::frontend::tab::register::Register;
 use crate::backend::core::Core;
-use crate::frontend::tab::console::Console;
-use crate::frontend::tab::setting::Setting;
+use crate::frontend::core_gui_wrapper::CoreGuiWrapper;
 use crate::frontend::tab::Tab;
+use crate::frontend::tab::about::About;
+use crate::frontend::tab::console::Console;
+use crate::frontend::tab::control::Control;
+use crate::frontend::tab::datapath::Datapath;
+use crate::frontend::tab::memory::Memory;
+use crate::frontend::tab::register::Register;
+use crate::frontend::tab::setting::Setting;
+use crossbeam_channel::unbounded;
 use egui::ScrollArea;
 use std::collections::BTreeSet;
 use std::sync::Arc;
-use crossbeam_channel::unbounded;
-use crate::frontend::core_gui_wrapper::CoreGuiWrapper;
 #[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 #[cfg(target_arch = "wasm32")]
 use wasm_thread as thread;
-use crate::frontend::tab::control::Control;
-use crate::frontend::tab::datapath::Datapath;
-use crate::frontend::tab::memory::Memory;
 
 pub struct CoreApp {
     widgets: Vec<Box<dyn Tab>>,
@@ -55,13 +55,24 @@ impl Default for CoreApp {
 
         Self {
             widgets: vec![
-                Box::new(Control::new(control_command_channel.0.clone(), control_ack_channel.1.clone())),
-                Box::new(Memory::new(breakpoint_channel.0.clone(), memory_channel.1.clone(), label_channel.1.clone(), load_elf_channel.0.clone())),
+                Box::new(Control::new(
+                    control_command_channel.0.clone(),
+                    control_ack_channel.1.clone(),
+                )),
+                Box::new(Memory::new(
+                    breakpoint_channel.0.clone(),
+                    memory_channel.1.clone(),
+                    label_channel.1.clone(),
+                    load_elf_channel.0.clone(),
+                )),
                 Box::new(Register::new(register_data_channel.1.clone())),
                 Box::new(Datapath::new(datapath_component_channel.1.clone())),
-                Box::new(Console::new(console_vga_buffer_channel.1.clone(), console_keyboard_buffer_channel.0.clone())),
+                Box::new(Console::new(
+                    console_vga_buffer_channel.1.clone(),
+                    console_keyboard_buffer_channel.0.clone(),
+                )),
                 Box::new(Setting::default()),
-                Box::new(About {})
+                Box::new(About {}),
             ],
             opened_widget_by_name: Default::default(),
         }
@@ -78,17 +89,17 @@ impl CoreApp {
             .resizable(false)
             .default_width(125.0)
             .show(ctx, |ui| {
-            ScrollArea::vertical().show(ui, |ui| {
-                ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
-                    let opened_widget_by_name = &mut self.opened_widget_by_name;
-                    for widget in self.widgets.iter_mut() {
-                        let mut is_open = opened_widget_by_name.contains(widget.name());
-                        ui.toggle_value(&mut is_open, widget.name());
-                        Self::set_open(opened_widget_by_name, widget.name(), is_open);
-                    }
+                ScrollArea::vertical().show(ui, |ui| {
+                    ui.with_layout(egui::Layout::top_down_justified(egui::Align::LEFT), |ui| {
+                        let opened_widget_by_name = &mut self.opened_widget_by_name;
+                        for widget in self.widgets.iter_mut() {
+                            let mut is_open = opened_widget_by_name.contains(widget.name());
+                            ui.toggle_value(&mut is_open, widget.name());
+                            Self::set_open(opened_widget_by_name, widget.name(), is_open);
+                        }
+                    });
                 });
             });
-        });
     }
 
     fn show_widgets(&mut self, ctx: &egui::Context) {

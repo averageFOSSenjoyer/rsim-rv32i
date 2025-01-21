@@ -1,27 +1,24 @@
-use egui::Color32;
-use crate::frontend::util::datapath_component::DatapathComponent;
 use crate::backend::core::ComponentType;
-use strum::IntoEnumIterator;
 use crate::frontend::tab::Tab;
-use crate::frontend::util::datapath_net::{DatapathNet, DatapathNetDispalyer};
-use eframe::emath::Vec2;
-use egui::{Context, Rect, Sense, Ui};
-use std::collections::{HashMap};
-use crossbeam_channel::Receiver;
-use egui::epaint::{PathShape, PathStroke};
+use crate::frontend::util::datapath_component::DatapathComponent;
 use crate::frontend::util::datapath_component::DatapathComponentWidget;
+use crate::frontend::util::datapath_net::{DatapathNet, DatapathNetDispalyer};
+use crossbeam_channel::Receiver;
+use eframe::emath::Vec2;
+use egui::Color32;
+use egui::epaint::{PathShape, PathStroke};
+use egui::{Context, Rect, Sense, Ui};
+use std::collections::HashMap;
+use strum::IntoEnumIterator;
 
-pub type DatapathComponentMap =
-    HashMap<ComponentType, DatapathComponent>;
+pub type DatapathComponentMap = HashMap<ComponentType, DatapathComponent>;
 pub struct Datapath {
     datapath_components_receiver: Receiver<DatapathComponentMap>,
     datapath_components: DatapathComponentMap,
 }
 
 impl Datapath {
-    pub fn new(
-        datapath_components_receiver: Receiver<DatapathComponentMap>,
-    ) -> Self {
+    pub fn new(datapath_components_receiver: Receiver<DatapathComponentMap>) -> Self {
         Datapath {
             datapath_components_receiver,
             datapath_components: Default::default(),

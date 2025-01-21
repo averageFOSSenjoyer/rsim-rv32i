@@ -19,7 +19,7 @@ use crate::backend::util::byte::Bytes;
 use crate::backend::util::types::Byte;
 use crate::backend::util::types::States;
 use crate::backend::util::types::Word;
-use crossbeam_channel::{unbounded, Receiver, Sender};
+use crossbeam_channel::{Receiver, Sender, unbounded};
 use rsim_core::component::Component;
 use rsim_core::sim_dispatcher::SimDispatcher;
 use rsim_core::sim_manager::SimManager;
@@ -36,11 +36,10 @@ use std::thread::JoinHandle;
 #[cfg(target_arch = "wasm32")]
 use wasm_thread as thread;
 #[cfg(target_arch = "wasm32")]
-use wasm_thread::JoinHandle as JoinHandle;
+use wasm_thread::JoinHandle;
 
 use strum::EnumIter;
 use strum::IntoEnumIterator;
-use crate::frontend::core_gui_wrapper::CoreGuiWrapper;
 
 #[derive(EnumIter, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 enum StatsType {
@@ -200,20 +199,20 @@ impl Core {
         }
     }
 
-    pub fn run_cycle<F: Fn(&CoreGuiWrapper) + Copy>(&self, hook: Option<F>, core_gui_wrapper: Option<&CoreGuiWrapper>) {
+    pub fn run_cycle<F: Fn() + Copy>(&self, hook: Option<F>) {
         self.sim_manager.run_cycle().unwrap();
         self.sim_manager.run_cycle_end().unwrap();
         self.log_commits();
-        if let (Some(ref hook), Some(core_gui_wrapper)) = (hook, core_gui_wrapper) {
-            hook(core_gui_wrapper);
+        if let Some(ref hook) = hook {
+            hook();
         }
     }
 
-    pub fn run_instruction<F: Fn(&CoreGuiWrapper) + Copy>(&self, hook: Option<F>, core_gui_wrapper: Option<&CoreGuiWrapper>) {
+    pub fn run_instruction<F: Fn() + Copy>(&self, hook: Option<F>) {
         let old_pc = self.pc.lock().unwrap().data_inner;
 
         while !self.ir.lock().unwrap().can_end() && old_pc == self.pc.lock().unwrap().data_inner {
-            self.run_cycle(hook, core_gui_wrapper)
+            self.run_cycle(hook)
         }
 
         let mut locked_stats = self.stats.lock().unwrap();
@@ -221,18 +220,18 @@ impl Core {
         locked_stats.insert(InstructionsRan, instructions_ran + 1);
     }
 
-    pub fn run_until_addr<F: Fn(&CoreGuiWrapper) + Copy>(&self, addr: &BTreeSet<Word>, hook: Option<F>, core_gui_wrapper: Option<&CoreGuiWrapper>) {
+    pub fn run_until_addr<F: Fn() + Copy>(&self, addr: &BTreeSet<Word>, hook: Option<F>) {
         while !self.ir.lock().unwrap().can_end() {
             if addr.contains(&self.pc.lock().unwrap().data_inner) {
                 break;
             }
-            self.run_instruction(hook, core_gui_wrapper);
+            self.run_instruction(hook);
         }
     }
 
-    pub fn run_end<F: Fn(&CoreGuiWrapper) + Copy>(&self, hook: Option<F>, core_gui_wrapper: Option<&CoreGuiWrapper>) {
+    pub fn run_end<F: Fn() + Copy>(&self, hook: Option<F>) {
         while !self.ir.lock().unwrap().can_end() {
-            self.run_instruction(hook, core_gui_wrapper);
+            self.run_instruction(hook);
         }
     }
 

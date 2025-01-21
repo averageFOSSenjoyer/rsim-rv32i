@@ -1,10 +1,10 @@
-use crossbeam_channel::Receiver;
 use crate::backend::component::mem_ctl::{KeyboardMmioCtl, VgaMmioCtl};
 use crate::frontend::tab::Tab;
 use crate::frontend::util::vga::get_pixels;
 use crate::frontend::util::vga::{NUM_FONT_COLS, NUM_FONT_ROWS};
-use egui::{Context, Image, TextureHandle, Ui};
+use crossbeam_channel::Receiver;
 use crossbeam_channel::Sender;
+use egui::{Context, Image, TextureHandle, Ui};
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 #[cfg(target_arch = "wasm32")]
@@ -72,11 +72,9 @@ impl Tab for Console {
                     VgaMmioCtl::NUM_COLS as f32 * NUM_FONT_COLS as f32,
                     VgaMmioCtl::NUM_ROWS as f32 * NUM_FONT_ROWS as f32,
                 ]
-                    .into(),
+                .into(),
             )));
         }
-
-
 
         ui.strong("Text Input").on_hover_ui(|ui| {
             ui.label(format!(
@@ -93,7 +91,10 @@ impl Tab for Console {
             );
         });
 
-        self.input_buffer.as_bytes().iter().for_each(|byte| self.keyboard_buffer_sender.try_send(*byte).unwrap());
+        self.input_buffer
+            .as_bytes()
+            .iter()
+            .for_each(|byte| self.keyboard_buffer_sender.try_send(*byte).unwrap());
         self.input_buffer.clear();
     }
 }

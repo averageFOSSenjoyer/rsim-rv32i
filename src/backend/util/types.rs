@@ -1,5 +1,5 @@
 use crate::backend::util::byte::Bytes;
-use strum::Display;
+use strum::{Display, EnumIter};
 
 pub type Word = Bytes<4>;
 pub type Byte = Bytes<1>;
@@ -103,7 +103,7 @@ pub mod alu_op {
     pub const AND: u8 = 0b111;
 }
 
-#[derive(Display, Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Display, Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter)]
 pub enum States {
     Fetch1,
     Fetch2,

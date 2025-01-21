@@ -1,5 +1,7 @@
 use crate::backend::util::types::{Byte, Word};
-use crossbeam_channel::{unbounded, Sender};
+use crossbeam_channel::{Sender, unbounded};
+use elf::ElfBytes;
+use elf::endian::LittleEndian;
 use rsim_core::component::Component;
 use rsim_core::rx::Rx;
 use rsim_core::sim_manager::SimManager;
@@ -13,8 +15,6 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
-use elf::ElfBytes;
-use elf::endian::LittleEndian;
 
 #[ComponentAttribute({
 "port": {
@@ -100,7 +100,7 @@ impl MemCtl {
             if self.cpu_write_en.get_value().is_something_nonzero() {
                 if let Some(wmask) = Into::<Option<u8>>::into(self.cpu_wmask.get_value()) {
                     for i in 0..4 {
-                        if wmask >> i & 0x1 == 0x1 {
+                        if (wmask >> i) & 0x1 == 0x1 {
                             let addr_idx = (self.cpu_addr.get_value() & Word::from(0xFFFFFFFCu32))
                                 + Word::from(i as u32);
                             let data = self.cpu_wdata.get_value()[i]
@@ -124,11 +124,12 @@ impl MemCtl {
                     }
                 }
                 self.cpu_resp.send(Byte::from(1u8), 0);
+                self.is_busy = true;
             } else if self.cpu_read_en.get_value().is_something_nonzero() {
                 let mut ret = Word::unknown();
                 if let Some(rmask) = Into::<Option<u8>>::into(self.cpu_rmask.get_value()) {
                     for i in 0..4 {
-                        if rmask >> i & 0x1 == 0x1 {
+                        if (rmask >> i) & 0x1 == 0x1 {
                             let addr_idx = (self.cpu_addr.get_value() & Word::from(0xFFFFFFFCu32))
                                 + Word::from(i as u32);
                             if self.backend_mem.contains_key(&addr_idx) {
@@ -148,39 +149,46 @@ impl MemCtl {
 
                 self.cpu_rdata.send(ret, 0);
                 self.cpu_resp.send(Byte::from(1u8), 0);
-            } else {
-                self.cpu_resp.send(Byte::from(0u8), 0);
+                self.is_busy = true;
             }
+        } else {
+            self.cpu_resp.send(Byte::from(0u8), 0);
+            self.is_busy = false;
         }
     }
 
     fn on_comb(&mut self) {}
 
     pub fn load_elf(&mut self, data: &[u8]) {
-        ElfBytes::<LittleEndian>::minimal_parse(data).map(|elf_bytes| {
-            // symbol table
-            if let Ok(Some((symbol_table, string_table))) = elf_bytes.symbol_table() {
-                for symbol in symbol_table.iter() {
-                    if symbol.st_name != 0 {
-                        if let Ok(symbol_name) = string_table.get(symbol.st_name as usize) {
-                            self.label.insert(Word::from(symbol.st_value as u32), symbol_name.to_string());
+        ElfBytes::<LittleEndian>::minimal_parse(data)
+            .map(|elf_bytes| {
+                // symbol table
+                if let Ok(Some((symbol_table, string_table))) = elf_bytes.symbol_table() {
+                    for symbol in symbol_table.iter() {
+                        if symbol.st_name != 0 {
+                            if let Ok(symbol_name) = string_table.get(symbol.st_name as usize) {
+                                self.label.insert(
+                                    Word::from(symbol.st_value as u32),
+                                    symbol_name.to_string(),
+                                );
+                            }
                         }
                     }
                 }
-            }
-            // sections
-            if let Some(section_table) = elf_bytes.section_headers() {
-                for section_header in section_table.iter() {
-                    if let Ok((section_data, _)) = elf_bytes.section_data(&section_header) {
-                        let addr = Word::from(section_header.sh_addr as u32);
-                        for i in 0..section_data.len() as u32 {
-                            self.backend_mem
-                                .insert(addr + Word::from(i), section_data[i as usize].into());
+                // sections
+                if let Some(section_table) = elf_bytes.section_headers() {
+                    for section_header in section_table.iter() {
+                        if let Ok((section_data, _)) = elf_bytes.section_data(&section_header) {
+                            let addr = Word::from(section_header.sh_addr as u32);
+                            for i in 0..section_data.len() as u32 {
+                                self.backend_mem
+                                    .insert(addr + Word::from(i), section_data[i as usize].into());
+                            }
                         }
                     }
                 }
-            }
-        }).unwrap_or_else(|_| println!("Failed to parse ELF file"));
+            })
+            .unwrap_or_else(|_| println!("Failed to parse ELF file"));
     }
 }
 

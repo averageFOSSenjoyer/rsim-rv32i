@@ -11,10 +11,7 @@ pub struct Control {
 }
 
 impl Control {
-    pub fn new(
-        command_sender: Sender<ControlCommand>,
-        ack_receiver: Receiver<()>,
-    ) -> Self {
+    pub fn new(command_sender: Sender<ControlCommand>, ack_receiver: Receiver<()>) -> Self {
         Control {
             command_sender,
             ack_receiver,

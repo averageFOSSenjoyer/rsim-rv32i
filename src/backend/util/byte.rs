@@ -330,7 +330,7 @@ impl<const T: usize> From<Bytes<T>> for Option<u16> {
                 ret = None;
                 break;
             } else {
-                ret = Some(ret.unwrap() | (val.data[i].unwrap() as u16) << (i * 8));
+                ret = Some(ret.unwrap() | ((val.data[i].unwrap() as u16) << (i * 8)));
             }
         }
         ret
@@ -345,7 +345,7 @@ impl<const T: usize> From<Bytes<T>> for Option<u32> {
                 ret = None;
                 break;
             } else {
-                ret = Some(ret.unwrap() | (val.data[i].unwrap() as u32) << (i * 8));
+                ret = Some(ret.unwrap() | ((val.data[i].unwrap() as u32) << (i * 8)));
             }
         }
         ret
@@ -360,7 +360,7 @@ impl<const T: usize> From<Bytes<T>> for Option<u64> {
                 ret = None;
                 break;
             } else {
-                ret = Some(ret.unwrap() | (val.data[i].unwrap() as u64) << (i * 8));
+                ret = Some(ret.unwrap() | ((val.data[i].unwrap() as u64) << (i * 8)));
             }
         }
         ret
@@ -375,7 +375,7 @@ impl<const T: usize> From<Bytes<T>> for Option<u128> {
                 ret = None;
                 break;
             } else {
-                ret = Some(ret.unwrap() | (val.data[i].unwrap() as u128) << (i * 8));
+                ret = Some(ret.unwrap() | ((val.data[i].unwrap() as u128) << (i * 8)));
             }
         }
         ret
@@ -658,7 +658,7 @@ impl<const T: usize, const R: usize> Shra<Bytes<R>> for Bytes<T> {
 
         if bit_shift_count != 0 {
             result.data[T - byte_shift_count - 1] = Some(
-                msb_fill.unwrap() << (8 - bit_shift_count)
+                (msb_fill.unwrap() << (8 - bit_shift_count))
                     | result.data[T - byte_shift_count - 1].unwrap(),
             );
         }
