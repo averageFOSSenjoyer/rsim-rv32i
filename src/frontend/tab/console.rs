@@ -41,6 +41,10 @@ impl Tab for Console {
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {
+        while let Ok(vga_buffer) = self.vga_buffer_receiver.try_recv() {
+            self.vga_buffer = Some(vga_buffer);
+        }
+
         egui::Window::new(self.name())
             .open(open)
             .default_width(640.0)
@@ -56,9 +60,6 @@ impl Tab for Console {
             ui.label(format!("VGA operates in text mode, blink bit is the not enabled.\nVGA Address ranges from 0x{:08X} to 0x{:08X}", VgaMmioCtl::BASE_ADDR, VgaMmioCtl::BASE_ADDR + VgaMmioCtl::NUM_BYTES as u32));
         });
         ui.separator();
-        while let Ok(vga_buffer) = self.vga_buffer_receiver.try_recv() {
-            self.vga_buffer = Some(vga_buffer);
-        }
         if let Some(vga_buffer) = self.vga_buffer {
             if self.last_vga_update_instant.elapsed().as_millis() > 16 {
                 self.texture_handle = Some(get_pixels(ctx, &vga_buffer));

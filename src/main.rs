@@ -24,6 +24,7 @@ fn main() {
     use eframe::wasm_bindgen::JsCast as _;
     console_log::init().unwrap();
     console_error_panic_hook::set_once();
+    std::panic::set_hook(Box::new(|_| log::info!("oh no")));
     eframe::WebLogger::init(log::LevelFilter::Trace).ok();
 
     wasm_bindgen_futures::spawn_local(async {

@@ -26,6 +26,10 @@ impl Tab for Control {
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {
+        if self.ack_receiver.try_recv().is_ok() {
+            self.ready = true;
+        }
+
         egui::Window::new(self.name())
             .open(open)
             .resizable(false)
@@ -63,8 +67,5 @@ impl Tab for Control {
                 }
             });
         });
-        if self.ack_receiver.try_recv().is_ok() {
-            self.ready = true;
-        }
     }
 }

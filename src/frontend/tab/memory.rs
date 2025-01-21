@@ -177,6 +177,13 @@ impl Tab for Memory {
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {
+        while let Ok(memory) = self.memory_receiver.try_recv() {
+            self.memory = memory;
+        }
+        while let Ok(label) = self.label_receiver.try_recv() {
+            self.label = label;
+        }
+
         egui::Window::new(self.name())
             .open(open)
             .resizable([false, true])
@@ -188,12 +195,6 @@ impl Tab for Memory {
     }
 
     fn ui(&mut self, ctx: &Context, ui: &mut Ui) {
-        while let Ok(memory) = self.memory_receiver.try_recv() {
-            self.memory = memory;
-        }
-        while let Ok(label) = self.label_receiver.try_recv() {
-            self.label = label;
-        }
         ui.vertical(|ui| {
             ui.horizontal(|ui| {
                 ui.label("Memory Address: ");

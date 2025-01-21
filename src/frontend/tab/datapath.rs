@@ -32,6 +32,10 @@ impl Tab for Datapath {
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {
+        while let Ok(datapath_components) = self.datapath_components_receiver.try_recv() {
+            self.datapath_components = datapath_components;
+        }
+
         egui::Window::new(self.name())
             .open(open)
             .default_height(800.0)
@@ -43,10 +47,6 @@ impl Tab for Datapath {
     }
 
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui) {
-        while let Ok(datapath_components) = self.datapath_components_receiver.try_recv() {
-            self.datapath_components = datapath_components;
-        }
-
         let (resp, painter) = ui.allocate_painter(Vec2::new(1180.0, 680.0), Sense::hover());
         let window_pos2: [f32; 2] = resp.rect.left_top().into();
 

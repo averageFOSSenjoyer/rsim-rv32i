@@ -18,6 +18,10 @@ impl Tab for Register {
     }
 
     fn show(&mut self, ctx: &Context, open: &mut bool) {
+        while let Ok(data) = self.data_receiver.try_recv() {
+            self.data = Some(data);
+        }
+
         egui::Window::new(self.name())
             .open(open)
             .default_width(425.0)
@@ -29,9 +33,6 @@ impl Tab for Register {
     }
 
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui) {
-        while let Ok(data) = self.data_receiver.try_recv() {
-            self.data = Some(data);
-        }
         if let Some(data) = &self.data {
             ui.vertical(|ui| {
                 ui.strong("Machine Registers");
