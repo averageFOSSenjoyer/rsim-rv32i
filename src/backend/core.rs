@@ -386,10 +386,30 @@ impl Core {
         let regfile_rs2_data_rx_mwdr = regfile_rs2_data.add_rx();
         let mwdr_out_rx = mwdr_out.add_rx();
 
+        let pc_mux = Arc::new(Mutex::new(PcMux::new(
+            3,
+            sim_manager.clone(),
+            ack_channel.0.clone(),
+            pc_out_rx_pc_mux,
+            alu_out_rx_pc_mux,
+            control_pc_mux_sel_rx,
+            pc_mux_out,
+        )));
+
+        let pc = Arc::new(Mutex::new(Pc::new(
+            4,
+            sim_manager.clone(),
+            ack_channel.0.clone(),
+            control_pc_load_rx,
+            pc_mux_out_rx,
+            pc_out,
+        )));
+
         let mem_ctl = Arc::new(Mutex::new(MemCtl::new(
             0,
             sim_manager.clone(),
             ack_channel.0.clone(),
+            pc.clone(),
             mar_out_rx_mem_ctl,
             mwdr_out_rx,
             control_mem_read_rx,
@@ -457,25 +477,6 @@ impl Core {
             ir_rs1_idx,
             ir_rs2_idx,
             ir_rd_idx,
-        )));
-
-        let pc_mux = Arc::new(Mutex::new(PcMux::new(
-            3,
-            sim_manager.clone(),
-            ack_channel.0.clone(),
-            pc_out_rx_pc_mux,
-            alu_out_rx_pc_mux,
-            control_pc_mux_sel_rx,
-            pc_mux_out,
-        )));
-
-        let pc = Arc::new(Mutex::new(Pc::new(
-            4,
-            sim_manager.clone(),
-            ack_channel.0.clone(),
-            control_pc_load_rx,
-            pc_mux_out_rx,
-            pc_out,
         )));
 
         let mar_mux = Arc::new(Mutex::new(MarMux::new(

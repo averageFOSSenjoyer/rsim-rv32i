@@ -15,6 +15,7 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
+use crate::backend::component::pc::Pc;
 
 #[ComponentAttribute({
 "port": {
@@ -38,6 +39,7 @@ use std::sync::{Arc, Mutex};
 pub struct MemCtl {
     pub backend_mem: BTreeMap<Word, Byte>,
     pub label: BTreeMap<Word, String>,
+    pc: Arc<Mutex<Pc>>,
     mmio_ctl: HashMap<Range<u32>, Arc<Mutex<dyn MmioCtl>>>,
     is_busy: bool,
 }
@@ -47,6 +49,7 @@ impl MemCtl {
         component_id: ComponentId,
         sim_manager: Arc<SimManager>,
         ack_sender: Sender<EventId>,
+        pc: Arc<Mutex<Pc>>,
         cpu_addr: Rx<Word>,
         cpu_wdata: Rx<Word>,
         cpu_read_en: Rx<Byte>,
@@ -61,6 +64,7 @@ impl MemCtl {
         MemCtl {
             backend_mem: Default::default(),
             label: Default::default(),
+            pc,
             mmio_ctl: Default::default(),
             is_busy: false,
             component_id,
@@ -187,6 +191,8 @@ impl MemCtl {
                         }
                     }
                 }
+                // entry
+                self.pc.lock().unwrap().data_inner = Word::from(elf_bytes.ehdr.e_entry as u32);
             })
             .unwrap_or_else(|_| println!("Failed to parse ELF file"));
     }
