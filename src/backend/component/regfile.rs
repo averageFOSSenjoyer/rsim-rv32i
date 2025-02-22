@@ -149,8 +149,8 @@ impl Debug for RegFile {
         ["alu_out", "Word"],
         ["cmp_out", "Word"],
         ["u_imm", "Word"],
-        ["mar", "Word"],
-        ["mrdr", "Word"],
+        ["mem_addr_mux_out", "Word"],
+        ["mem_rdata", "Word"],
         ["pc", "Word"],
         ["sel", "Byte"]
     ],
@@ -169,8 +169,8 @@ impl RegFileMux {
         alu_out: Rx<Word>,
         cmp_out: Rx<Word>,
         u_imm: Rx<Word>,
-        mar: Rx<Word>,
-        mrdr: Rx<Word>,
+        mem_addr_mux_out: Rx<Word>,
+        mem_rdata: Rx<Word>,
         pc: Rx<Word>,
         sel: Rx<Byte>,
         out: Tx<Word>,
@@ -182,8 +182,8 @@ impl RegFileMux {
             alu_out,
             cmp_out,
             u_imm,
-            mar,
-            mrdr,
+            mem_addr_mux_out,
+            mem_rdata,
             pc,
             sel,
             out,
@@ -197,16 +197,17 @@ impl RegFileMux {
     fn poll_impl(&mut self) {}
 
     fn on_comb(&mut self) {
-        let mrdr_idx =
-            (Into::<Option<u32>>::into(self.mar.get_value()).unwrap_or(0) & 0x3u32) as usize;
+        let mem_rdata_idx = (Into::<Option<u32>>::into(self.mem_addr_mux_out.get_value())
+            .unwrap_or(0)
+            & 0x3u32) as usize;
         let out = match self.sel.get_value().into() {
             Some(mux_sel::regfile::ALU_OUT) => self.alu_out.get_value(),
             Some(mux_sel::regfile::BR_EN) => self.cmp_out.get_value(),
             Some(mux_sel::regfile::U_IMM) => self.u_imm.get_value(),
-            Some(mux_sel::regfile::LW) => self.mrdr.get_value(),
+            Some(mux_sel::regfile::LW) => self.mem_rdata.get_value(),
             Some(mux_sel::regfile::PC_PLUS4) => self.pc.get_value() + Word::from(4u32),
             Some(mux_sel::regfile::LB) => {
-                let val = self.mrdr.get_value()[mrdr_idx]
+                let val = self.mem_rdata.get_value()[mem_rdata_idx]
                     .map(|byte| Word::from(byte as u32))
                     .unwrap_or(Word::unknown());
                 if !val.has_unknown() {
@@ -215,13 +216,17 @@ impl RegFileMux {
                     Word::unknown()
                 }
             }
-            Some(mux_sel::regfile::LBU) => self.mrdr.get_value()[mrdr_idx]
+            Some(mux_sel::regfile::LBU) => self.mem_rdata.get_value()[mem_rdata_idx]
                 .map(|byte| Word::from(byte as u32))
                 .unwrap_or(Word::unknown()),
             Some(mux_sel::regfile::LH) => {
-                let val = self.mrdr.get_value()[mrdr_idx]
+                let val = self.mem_rdata.get_value()[mem_rdata_idx]
                     .map(|lsb| {
-                        self.mrdr.get_value()[mrdr_idx + 1]
+                        self.mem_rdata
+                            .get_value()
+                            .data
+                            .get(mem_rdata_idx + 1)
+                            .unwrap_or(&None)
                             .map(|msb| Word::from((((msb as u16) << 8) | lsb as u16) as u32))
                             .unwrap_or(Word::unknown())
                     })
@@ -232,9 +237,9 @@ impl RegFileMux {
                     Word::unknown()
                 }
             }
-            Some(mux_sel::regfile::LHU) => self.mrdr.get_value()[mrdr_idx]
+            Some(mux_sel::regfile::LHU) => self.mem_rdata.get_value()[mem_rdata_idx]
                 .map(|lsb| {
-                    self.mrdr.get_value()[mrdr_idx + 1]
+                    self.mem_rdata.get_value()[mem_rdata_idx + 1]
                         .map(|msb| Word::from((((msb as u16) << 8) | lsb as u16) as u32))
                         .unwrap_or(Word::unknown())
                 })
@@ -250,12 +255,12 @@ impl Debug for RegFileMux {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
-            "RegFileMux: {{alu_out: {:?}, cmp_out: {:?}, u_imm: {:?}, mar: {:?} mrdr: {:?} pc: {:?} sel: {:?}}}",
+            "RegFileMux: {{alu_out: {:?}, cmp_out: {:?}, u_imm: {:?}, mem_addr_mux_out: {:?} mem_rdata: {:?} pc: {:?} sel: {:?}}}",
             self.alu_out.get_value(),
             self.cmp_out.get_value(),
             self.u_imm.get_value(),
-            self.mar.get_value(),
-            self.mrdr.get_value(),
+            self.mem_addr_mux_out.get_value(),
+            self.mem_rdata.get_value(),
             self.pc.get_value(),
             self.sel.get_value()
         )

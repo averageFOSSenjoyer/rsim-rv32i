@@ -11,7 +11,7 @@ pub mod mux_sel {
         pub const ALU_MOD2: u8 = 0x02;
     }
 
-    pub mod mar {
+    pub mod mem_addr {
         pub const PC_OUT: u8 = 0x00;
         pub const ALU_OUT: u8 = 0x01;
     }
@@ -105,19 +105,15 @@ pub mod alu_op {
 
 #[derive(Display, Copy, Clone, Debug, PartialEq, Eq, Hash, EnumIter)]
 pub enum States {
-    Fetch1,
-    Fetch2,
-    Fetch3,
+    Fetch,
     Decode,
     Imm,
     Lui,
     Br,
     Auipc,
     AddrCalc,
-    Load1,
-    Load2,
-    Store1,
-    Store2,
+    Load,
+    Store,
     Jal,
     Jalr,
     Reg,

@@ -1,3 +1,4 @@
+use crate::backend::component::pc::Pc;
 use crate::backend::util::types::{Byte, Word};
 use crossbeam_channel::{Sender, unbounded};
 use elf::ElfBytes;
@@ -15,13 +16,11 @@ use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::fmt::{Debug, Formatter};
 use std::ops::Range;
 use std::sync::{Arc, Mutex};
-use crate::backend::component::pc::Pc;
 
 #[ComponentAttribute({
 "port": {
     "input": [
         ["cpu_addr", "Word"],
-
         ["cpu_wdata", "Word"],
         ["cpu_read_en", "Byte"],
         ["cpu_rmask", "Byte"],
@@ -103,26 +102,27 @@ impl MemCtl {
             // a r/w request came in
             if self.cpu_write_en.get_value().is_something_nonzero() {
                 if let Some(wmask) = Into::<Option<u8>>::into(self.cpu_wmask.get_value()) {
-                    for i in 0..4 {
-                        if (wmask >> i) & 0x1 == 0x1 {
-                            let addr_idx = (self.cpu_addr.get_value() & Word::from(0xFFFFFFFCu32))
-                                + Word::from(i as u32);
-                            let data = self.cpu_wdata.get_value()[i]
-                                .map(Byte::from)
-                                .unwrap_or(Byte::unknown());
+                    if let Some(raw_addr_idx) = Into::<Option<u32>>::into(self.cpu_addr.get_value())
+                    {
+                        for i in 0..4 {
+                            if (wmask >> i) & 0x1 == 0x1 {
+                                let addr_idx = (raw_addr_idx & 0xFFFFFFFCu32) + i as u32;
+                                let data = (self.cpu_wdata.get_value()
+                                    << Word::from(8 * (raw_addr_idx & 0x3)))[i]
+                                    .map(Byte::from)
+                                    .unwrap_or(Byte::unknown());
 
-                            let mut written_to_mmio = false;
-                            for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
-                                if let Some(addr_idx_u32) = addr_idx.into() {
-                                    if addr_range.contains(&addr_idx_u32) {
-                                        mmio_ctl.lock().unwrap().write(addr_idx, data);
+                                let mut written_to_mmio = false;
+                                for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
+                                    if addr_range.contains(&addr_idx) {
+                                        mmio_ctl.lock().unwrap().write(Word::from(addr_idx), data);
                                         written_to_mmio = true;
                                     }
                                 }
-                            }
 
-                            if !written_to_mmio {
-                                self.backend_mem.insert(addr_idx, data);
+                                if !written_to_mmio {
+                                    self.backend_mem.insert(Word::from(addr_idx), data);
+                                }
                             }
                         }
                     }
@@ -137,7 +137,7 @@ impl MemCtl {
                             let addr_idx = (self.cpu_addr.get_value() & Word::from(0xFFFFFFFCu32))
                                 + Word::from(i as u32);
                             if self.backend_mem.contains_key(&addr_idx) {
-                                ret[i] = self.backend_mem[&addr_idx].into()
+                                ret[i] = self.backend_mem[&addr_idx].into();
                             } else {
                                 for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
                                     if let Some(addr_idx_u32) = addr_idx.into() {
@@ -234,6 +234,12 @@ impl KeyboardMmioCtl {
     }
 }
 
+impl Default for KeyboardMmioCtl {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MmioCtl for KeyboardMmioCtl {
     fn read(&mut self, addr: Word) -> Byte {
         if let Some(addr) = Into::<Option<u32>>::into(addr) {
@@ -293,6 +299,12 @@ impl VgaMmioCtl {
 
     pub fn get_buffer(&mut self) -> &[u8; Self::NUM_BYTES] {
         &self.buffer
+    }
+}
+
+impl Default for VgaMmioCtl {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

@@ -57,14 +57,6 @@ impl Tab for Register {
                             ui.text_edit_singleline(&mut data.pc.clone())
                         });
                         ui.end_row();
-
-                        ui.strong("MAR");
-                        ui.text_edit_singleline(&mut data.mar.clone());
-                        ui.strong("MrDR");
-                        ui.text_edit_singleline(&mut data.mrdr.clone());
-                        ui.strong("MwDR");
-                        ui.text_edit_singleline(&mut data.mwdr.clone());
-                        ui.end_row();
                     });
 
                 ui.separator();

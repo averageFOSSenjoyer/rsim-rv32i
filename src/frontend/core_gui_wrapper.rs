@@ -68,9 +68,6 @@ impl CoreGuiWrapper {
             state: format!("{}", self.core.control.lock().unwrap().state.clone()),
             ir: format!("{}", self.core.ir.lock().unwrap().data_inner.clone()),
             pc: format!("{}", self.core.pc.lock().unwrap().data_inner.clone()),
-            mar: format!("{}", self.core.mar.lock().unwrap().data_inner.clone()),
-            mrdr: format!("{}", self.core.mrdr.lock().unwrap().data_inner.clone()),
-            mwdr: format!("{}", self.core.mwdr.lock().unwrap().data_inner.clone()),
             regfile: self
                 .core
                 .regfile
@@ -105,22 +102,17 @@ impl CoreGuiWrapper {
             self.core.cmp_mux.lock().unwrap().get_datapath_component(),
         );
         datapath_components.insert(Ir, self.core.ir.lock().unwrap().get_datapath_component());
-        datapath_components.insert(Mar, self.core.mar.lock().unwrap().get_datapath_component());
         datapath_components.insert(
-            MarMux,
-            self.core.mar_mux.lock().unwrap().get_datapath_component(),
+            MemAddrMux,
+            self.core
+                .mem_addr_mux
+                .lock()
+                .unwrap()
+                .get_datapath_component(),
         );
         datapath_components.insert(
             MemCtl,
             self.core.mem_ctl.lock().unwrap().get_datapath_component(),
-        );
-        datapath_components.insert(
-            MrDR,
-            self.core.mrdr.lock().unwrap().get_datapath_component(),
-        );
-        datapath_components.insert(
-            MwDR,
-            self.core.mwdr.lock().unwrap().get_datapath_component(),
         );
         datapath_components.insert(Pc, self.core.pc.lock().unwrap().get_datapath_component());
         datapath_components.insert(
@@ -212,8 +204,5 @@ pub struct RegisterData {
     pub state: String,
     pub ir: String,
     pub pc: String,
-    pub mar: String,
-    pub mrdr: String,
-    pub mwdr: String,
     pub regfile: [String; 32],
 }

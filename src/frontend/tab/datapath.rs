@@ -47,7 +47,7 @@ impl Tab for Datapath {
     }
 
     fn ui(&mut self, _ctx: &Context, ui: &mut Ui) {
-        let (resp, painter) = ui.allocate_painter(Vec2::new(1180.0, 680.0), Sense::hover());
+        let (resp, painter) = ui.allocate_painter(Vec2::new(1050.0, 680.0), Sense::hover());
         let window_pos2: [f32; 2] = resp.rect.left_top().into();
 
         for datapath_net in DatapathNet::iter() {

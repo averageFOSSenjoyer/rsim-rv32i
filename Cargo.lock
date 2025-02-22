@@ -2475,7 +2475,7 @@ dependencies = [
 
 [[package]]
 name = "rsim_rv32i"
-version = "1.0.0-beta.2"
+version = "1.0.0-beta.3"
 dependencies = [
  "console_error_panic_hook",
  "console_log",

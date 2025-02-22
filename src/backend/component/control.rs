@@ -20,23 +20,20 @@ use std::sync::Arc;
         ["funct7", "Byte"],
         ["cmp_out", "Word"],
         ["opcode", "Byte"],
-        ["mar", "Word"],
+        ["mem_addr_mux_out", "Word"],
         ["mem_resp", "Byte"]
     ],
     "output": [
-        ["load_mar", "Byte"],
-        ["load_mrdr", "Byte"],
         ["load_pc", "Byte"],
         ["load_ir", "Byte"],
         ["load_regfile", "Byte"],
-        ["load_mwdr", "Byte"],
         ["alu_op", "Byte"],
         ["cmp_op", "Byte"],
         ["pc_mux_sel", "Byte"],
         ["alu_mux1_sel", "Byte"],
         ["alu_mux2_sel", "Byte"],
         ["regfile_mux_sel", "Byte"],
-        ["mar_mux_sel", "Byte"],
+        ["mem_addr_mux_sel", "Byte"],
         ["cmp_mux_sel", "Byte"],
         ["mem_read", "Byte"],
         ["mem_write", "Byte"],
@@ -60,21 +57,18 @@ impl Control {
         funct7: Rx<Byte>,
         cmp_out: Rx<Word>,
         opcode: Rx<Byte>,
-        mar: Rx<Word>,
+        mem_addr_mux_out: Rx<Word>,
         mem_resp: Rx<Byte>,
-        load_mar: Tx<Byte>,
-        load_mrdr: Tx<Byte>,
         load_pc: Tx<Byte>,
         load_ir: Tx<Byte>,
         load_regfile: Tx<Byte>,
-        load_mwdr: Tx<Byte>,
         alu_op: Tx<Byte>,
         cmp_op: Tx<Byte>,
         pc_mux_sel: Tx<Byte>,
         alu_mux1_sel: Tx<Byte>,
         alu_mux2_sel: Tx<Byte>,
         regfile_mux_sel: Tx<Byte>,
-        mar_mux_sel: Tx<Byte>,
+        mem_addr_mux_sel: Tx<Byte>,
         cmp_mux_sel: Tx<Byte>,
         mem_read: Tx<Byte>,
         mem_write: Tx<Byte>,
@@ -84,8 +78,8 @@ impl Control {
         let clock_channel = unbounded();
 
         Control {
-            state: Fetch1,
-            next_state: Fetch1,
+            state: Fetch,
+            next_state: Fetch,
             component_id,
             sim_manager,
             ack_sender,
@@ -95,21 +89,18 @@ impl Control {
             funct7,
             cmp_out,
             opcode,
-            mar,
+            mem_addr_mux_out,
             mem_resp,
-            load_mar,
-            load_mrdr,
             load_pc,
             load_ir,
             load_regfile,
-            load_mwdr,
             alu_op,
             cmp_op,
             pc_mux_sel,
             alu_mux1_sel,
             alu_mux2_sel,
             regfile_mux_sel,
-            mar_mux_sel,
+            mem_addr_mux_sel,
             cmp_mux_sel,
             mem_read,
             mem_write,
@@ -121,8 +112,8 @@ impl Control {
     fn init_impl(&mut self) {}
 
     fn reset_impl(&mut self) {
-        self.state = Fetch1;
-        self.next_state = Fetch1;
+        self.state = Fetch;
+        self.next_state = Fetch;
     }
 
     fn poll_impl(&mut self) {}
@@ -132,16 +123,16 @@ impl Control {
     }
 
     pub fn get_rmask(&self) -> Byte {
-        if self.state == Fetch2 {
+        if self.state == Fetch {
             Byte::from(0x0Fu8)
         } else {
             match self.funct3.get_value().into() {
                 Some(funct3::load::LW) => Byte::from(0x0Fu8),
                 Some(funct3::load::LH) | Some(funct3::load::LHU) => {
-                    Byte::from(0x03u8) << (self.mar.get_value() & Byte::from(0x3u8))
+                    Byte::from(0x03u8) << (self.mem_addr_mux_out.get_value() & Byte::from(0x3u8))
                 }
                 Some(funct3::load::LB) | Some(funct3::load::LBU) => {
-                    Byte::from(0x01u8) << (self.mar.get_value() & Byte::from(0x3u8))
+                    Byte::from(0x01u8) << (self.mem_addr_mux_out.get_value() & Byte::from(0x3u8))
                 }
                 _ => Byte::unknown(),
             }
@@ -152,22 +143,19 @@ impl Control {
         match self.funct3.get_value().into() {
             Some(funct3::store::SW) => Byte::from(0x0Fu8),
             Some(funct3::store::SH) => {
-                Byte::from(0x03u8) << (self.mar.get_value() & Byte::from(0x3u8))
+                Byte::from(0x03u8) << (self.mem_addr_mux_out.get_value() & Byte::from(0x3u8))
             }
             Some(funct3::store::SB) => {
-                Byte::from(0x01u8) << (self.mar.get_value() & Byte::from(0x3u8))
+                Byte::from(0x01u8) << (self.mem_addr_mux_out.get_value() & Byte::from(0x3u8))
             }
             _ => Byte::unknown(),
         }
     }
 
     fn set_default_control_signals(&mut self) {
-        self.load_mar.send(Byte::from(0u8), 0);
-        self.load_mrdr.send(Byte::from(0u8), 0);
         self.load_pc.send(Byte::from(0u8), 0);
         self.load_ir.send(Byte::from(0u8), 0);
         self.load_regfile.send(Byte::from(0u8), 0);
-        self.load_mwdr.send(Byte::from(0u8), 0);
         self.mem_read.send(Byte::from(0u8), 0);
         self.mem_write.send(Byte::from(0u8), 0);
         self.mem_wmask.send(self.get_wmask(), 0);
@@ -184,17 +172,8 @@ impl Control {
         self.regfile_mux_sel.send(Byte::from(sel), 0);
     }
 
-    fn load_mar(&mut self, sel: u8) {
-        self.load_mar.send(Byte::from(1u8), 0);
-        self.mar_mux_sel.send(Byte::from(sel), 0);
-    }
-
     fn load_ir(&mut self) {
         self.load_ir.send(Byte::from(1u8), 0);
-    }
-
-    fn load_dout(&mut self) {
-        self.load_mwdr.send(Byte::from(1u8), 0);
     }
 
     fn set_alu(&mut self, sel1: u8, sel2: u8, alu_op: u8) {
@@ -209,7 +188,6 @@ impl Control {
     }
 
     fn read_from_mem(&mut self) {
-        self.load_mrdr.send(Byte::from(1u8), 0);
         self.mem_read.send(Byte::from(1u8), 0);
     }
 
@@ -219,14 +197,13 @@ impl Control {
 
     fn set_control_signal(&mut self) {
         match self.state {
-            Fetch1 => {
-                self.load_mar(mux_sel::mar::PC_OUT);
-            }
-            Fetch2 => {
+            Fetch => {
+                self.mem_addr_mux_sel
+                    .send(Byte::from(mux_sel::mem_addr::PC_OUT), 0);
                 self.read_from_mem();
-            }
-            Fetch3 => {
-                self.load_ir();
+                if self.mem_resp.get_value().is_something_nonzero() {
+                    self.load_ir();
+                }
             }
             Decode => {}
             Imm => {
@@ -333,7 +310,8 @@ impl Control {
                 self.load_pc(mux_sel::pc::PC_PLUS4);
             }
             AddrCalc => {
-                self.load_mar(mux_sel::mar::ALU_OUT);
+                self.mem_addr_mux_sel
+                    .send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
                 self.set_alu(
                     mux_sel::alu1::RS1_OUT,
                     if self.opcode.get_value() == Byte::from(opcode::LOAD) {
@@ -343,41 +321,38 @@ impl Control {
                     },
                     alu_op::ADD,
                 );
-                if self.opcode.get_value() == Byte::from(opcode::STORE) {
-                    self.load_dout();
-                }
             }
-            Load1 => {
+            Load => {
                 self.read_from_mem();
-            }
-            Load2 => {
-                if let Some(funct3) = Into::<Option<u8>>::into(self.funct3.get_value()) {
-                    match funct3 {
-                        funct3::load::LB => {
-                            self.load_regfile(mux_sel::regfile::LB);
+                if self.mem_resp.get_value().is_something_nonzero() {
+                    if let Some(funct3) = Into::<Option<u8>>::into(self.funct3.get_value()) {
+                        match funct3 {
+                            funct3::load::LB => {
+                                self.load_regfile(mux_sel::regfile::LB);
+                            }
+                            funct3::load::LH => {
+                                self.load_regfile(mux_sel::regfile::LH);
+                            }
+                            funct3::load::LW => {
+                                self.load_regfile(mux_sel::regfile::LW);
+                            }
+                            funct3::load::LBU => {
+                                self.load_regfile(mux_sel::regfile::LBU);
+                            }
+                            funct3::load::LHU => {
+                                self.load_regfile(mux_sel::regfile::LHU);
+                            }
+                            _ => {}
                         }
-                        funct3::load::LH => {
-                            self.load_regfile(mux_sel::regfile::LH);
-                        }
-                        funct3::load::LW => {
-                            self.load_regfile(mux_sel::regfile::LW);
-                        }
-                        funct3::load::LBU => {
-                            self.load_regfile(mux_sel::regfile::LBU);
-                        }
-                        funct3::load::LHU => {
-                            self.load_regfile(mux_sel::regfile::LHU);
-                        }
-                        _ => {}
                     }
+                    self.load_pc(mux_sel::pc::PC_PLUS4);
                 }
-                self.load_pc(mux_sel::pc::PC_PLUS4);
             }
-            Store1 => {
+            Store => {
                 self.write_to_mem();
-            }
-            Store2 => {
-                self.load_pc(mux_sel::pc::PC_PLUS4);
+                if self.mem_resp.get_value().is_something_nonzero() {
+                    self.load_pc(mux_sel::pc::PC_PLUS4);
+                }
             }
             Jal => {
                 self.load_pc(mux_sel::pc::ALU_OUT);
@@ -396,15 +371,13 @@ impl Control {
         self.next_state = self.state;
 
         self.next_state = match self.state {
-            Fetch1 => Fetch2,
-            Fetch2 => {
+            Fetch => {
                 if self.mem_resp.get_value().is_something_nonzero() {
-                    Fetch3
+                    Decode
                 } else {
-                    Fetch2
+                    Fetch
                 }
             }
-            Fetch3 => Decode,
             Decode => match Into::<Option<u8>>::into(self.opcode.get_value()) {
                 Some(opcode::LUI) => Lui,
                 Some(opcode::AUIPC) => Auipc,
@@ -414,30 +387,30 @@ impl Control {
                 Some(opcode::LOAD) | Some(opcode::STORE) => AddrCalc,
                 Some(opcode::IMM) => Imm,
                 Some(opcode::REG) => Reg,
-                _ => Fetch1,
+                _ => Fetch,
             },
             AddrCalc => {
                 if self.opcode.get_value() == Byte::from(opcode::LOAD) {
-                    Load1
+                    Load
                 } else {
-                    Store1
+                    Store
                 }
             }
-            Load1 => {
+            Load => {
                 if self.mem_resp.get_value().is_something_nonzero() {
-                    Load2
+                    Fetch
                 } else {
-                    Load1
+                    Load
                 }
             }
-            Store1 => {
+            Store => {
                 if self.mem_resp.get_value().is_something_nonzero() {
-                    Store2
+                    Fetch
                 } else {
-                    Store1
+                    Store
                 }
             }
-            _ => Fetch1,
+            _ => Fetch,
         }
     }
 

@@ -5,11 +5,8 @@ use crate::backend::component::cmp::Cmp;
 use crate::backend::component::cmp::CmpMux;
 use crate::backend::component::control::Control;
 use crate::backend::component::ir::IR;
-use crate::backend::component::mar::Mar;
-use crate::backend::component::mar::MarMux;
+use crate::backend::component::mem_addr_mux::MemAddrMux;
 use crate::backend::component::mem_ctl::{KeyboardMmioCtl, MemCtl, MmioCtl, VgaMmioCtl};
-use crate::backend::component::mrdr::Mrdr;
-use crate::backend::component::mwdr::Mwdr;
 use crate::backend::component::pc::Pc;
 use crate::backend::component::pc::PcMux;
 use crate::backend::component::regfile::RegFile;
@@ -54,11 +51,8 @@ pub enum ComponentType {
     Cmp,
     CmpMux,
     Ir,
-    Mar,
-    MarMux,
+    MemAddrMux,
     MemCtl,
-    MrDR,
-    MwDR,
     Pc,
     PcMux,
     RegFile,
@@ -77,9 +71,7 @@ pub struct Core {
     pub ir: Arc<Mutex<IR>>,
     pub pc_mux: Arc<Mutex<PcMux>>,
     pub pc: Arc<Mutex<Pc>>,
-    pub mar_mux: Arc<Mutex<MarMux>>,
-    pub mar: Arc<Mutex<Mar>>,
-    pub mrdr: Arc<Mutex<Mrdr>>,
+    pub mem_addr_mux: Arc<Mutex<MemAddrMux>>,
     pub alu_mux1: Arc<Mutex<AluMux1>>,
     pub alu_mux2: Arc<Mutex<AluMux2>>,
     pub alu: Arc<Mutex<Alu>>,
@@ -87,7 +79,6 @@ pub struct Core {
     pub cmp: Arc<Mutex<Cmp>>,
     pub regfile_mux: Arc<Mutex<RegFileMux>>,
     pub regfile: Arc<Mutex<RegFile>>,
-    pub mwdr: Arc<Mutex<Mwdr>>,
     pub keyboard_mmio_ctl: Arc<Mutex<KeyboardMmioCtl>>,
     pub vga_mmio_ctl: Arc<Mutex<VgaMmioCtl>>,
     commit_file: Mutex<Option<File>>,
@@ -102,16 +93,14 @@ impl Core {
             let pc = self.pc.lock().unwrap();
             let ir = self.ir.lock().unwrap();
             let regfile = self.regfile.lock().unwrap();
-            let mar = self.mar.lock().unwrap();
             let mem_ctl = self.mem_ctl.lock().unwrap();
 
-            if control.state == States::Fetch1
-                || control.state == States::Fetch2
-                || control.state == States::Fetch3
-                || control.state == States::Decode
-                || control.state == States::Store1
-                || control.state == States::Load1
-                || control.state == States::AddrCalc
+            if !ir.can_end()
+                && (control.state == States::Fetch
+                    || control.state == States::Decode
+                    || control.state == States::AddrCalc
+                    || ((control.state == States::Load || control.state == States::Store)
+                        && !mem_ctl.cpu_resp.get_value().is_something_nonzero()))
             {
                 return;
             }
@@ -135,30 +124,18 @@ impl Core {
                 line.push_str(&format!("0x{:x}", regfile.rd_data.get_value()));
             }
 
-            if control.state == States::Load2 && control.get_rmask().is_something_nonzero() {
-                let rmask = Into::<Option<u8>>::into(control.get_rmask()).unwrap();
-                let mut byte_shift = 0;
-                for i in 0..4u8 {
-                    if (rmask >> i) & 0x1 == 0x1 {
-                        byte_shift = i;
-                        break;
-                    }
-                }
-                line.push_str(&format!(
-                    " mem 0x{:x}",
-                    (mar.data_inner & Word::from(0xFFFFFFFCu32)) + Byte::from(byte_shift)
-                ));
+            if control.state == States::Load
+                && mem_ctl.cpu_rmask.get_value().is_something_nonzero()
+                && control.mem_resp.get_value().is_something_nonzero()
+            {
+                line.push_str(&format!(" mem 0x{:x}", mem_ctl.cpu_addr.get_value()));
             }
 
-            if control.state == States::Store2 && control.get_wmask().is_something_nonzero() {
-                let wmask = Into::<Option<u8>>::into(control.get_wmask()).unwrap();
-                let mut byte_shift = 0;
-                for i in 0..4u8 {
-                    if (wmask >> i) & 0x1 == 0x1 {
-                        byte_shift = i;
-                        break;
-                    }
-                }
+            if control.state == States::Store
+                && mem_ctl.cpu_wmask.get_value().is_something_nonzero()
+                && control.mem_resp.get_value().is_something_nonzero()
+            {
+                let wmask = Into::<Option<u8>>::into(mem_ctl.cpu_wmask.get_value()).unwrap();
                 let mut byte_count = 0;
                 for i in 0..4u8 {
                     if (wmask >> i) & 0x1 == 0x1 {
@@ -166,25 +143,21 @@ impl Core {
                     }
                 }
 
-                line.push_str(&format!(
-                    " mem 0x{:x}",
-                    (mar.data_inner & Word::from(0xFFFFFFFCu32)) + Byte::from(byte_shift)
-                ));
-                if let Some(mwdr) = Into::<Option<u32>>::into(mem_ctl.cpu_wdata.get_value()) {
-                    let shifted_data = mwdr >> (8 * byte_shift);
-                    let mwdr_str = match byte_count {
+                line.push_str(&format!(" mem 0x{:x}", mem_ctl.cpu_addr.get_value()));
+                if let Some(wdata) = Into::<Option<u32>>::into(mem_ctl.cpu_wdata.get_value()) {
+                    let wdata_str = match byte_count {
                         1 => {
-                            format!("{:x}", Byte::from(shifted_data as u8))
+                            format!("{:x}", Byte::from(wdata as u8))
                         }
                         2 => {
-                            format!("{:x}", Bytes::<2>::from(shifted_data as u16))
+                            format!("{:x}", Bytes::<2>::from(wdata as u16))
                         }
                         4 => {
-                            format!("{:x}", Word::from(shifted_data))
+                            format!("{:x}", Word::from(wdata))
                         }
                         _ => "".to_string(),
                     };
-                    line.push_str(&format!(" 0x{}", mwdr_str));
+                    line.push_str(&format!(" 0x{}", wdata_str));
                 }
             }
 
@@ -245,9 +218,7 @@ impl Core {
         self.ir.lock().unwrap().reset();
         self.pc_mux.lock().unwrap().reset();
         self.pc.lock().unwrap().reset();
-        self.mar_mux.lock().unwrap().reset();
-        self.mar.lock().unwrap().reset();
-        self.mrdr.lock().unwrap().reset();
+        self.mem_addr_mux.lock().unwrap().reset();
         self.alu_mux1.lock().unwrap().reset();
         self.alu_mux2.lock().unwrap().reset();
         self.alu.lock().unwrap().reset();
@@ -255,7 +226,6 @@ impl Core {
         self.cmp.lock().unwrap().reset();
         self.regfile_mux.lock().unwrap().reset();
         self.regfile.lock().unwrap().reset();
-        self.mwdr.lock().unwrap().reset();
         self.keyboard_mmio_ctl.lock().unwrap().reset();
         self.vga_mmio_ctl.lock().unwrap().reset();
 
@@ -281,19 +251,17 @@ impl Core {
         // i swear there has to be a better way of doing this
         let mut mem_ctl_cpu_rdata = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut mem_ctl_cpu_resp = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut control_mar_load = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut control_mrdr_load = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_pc_load = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_ir_load = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_rf_load = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut control_mwdr_load = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_alu_op = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_cmp_op = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_pc_mux_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_alu_mux1_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_alu_mux2_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_rf_mux_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut control_mar_mux_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
+        let mut control_mem_addr_mux_sel =
+            Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_cmp_mux_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_mem_read = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_mem_write = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
@@ -312,9 +280,7 @@ impl Core {
         let mut ir_rd_idx = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut pc_mux_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut pc_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut mar_mux_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut mar_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut mrdr_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
+        let mut mem_addr_mux_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut alu_mux1_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut alu_mux2_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut alu_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
@@ -323,23 +289,20 @@ impl Core {
         let mut regfile_mux_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut regfile_rs1_data = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut regfile_rs2_data = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut mwdr_out = Tx::<Word>::new(sim_manager.clone(), ack_channel.0.clone());
 
-        let mem_ctl_cpu_rdata_rx = mem_ctl_cpu_rdata.add_rx();
+        let mem_ctl_cpu_rdata_rx_ir = mem_ctl_cpu_rdata.add_rx();
+        let mem_ctl_cpu_rdata_rx_regfile_mux = mem_ctl_cpu_rdata.add_rx();
         let mem_ctl_cpu_resp_rx = mem_ctl_cpu_resp.add_rx();
-        let control_mar_load_rx = control_mar_load.add_rx();
-        let control_mrdr_load_rx = control_mrdr_load.add_rx();
         let control_pc_load_rx = control_pc_load.add_rx();
         let control_ir_load_rx = control_ir_load.add_rx();
         let control_rf_load_rx = control_rf_load.add_rx();
-        let control_mwdr_load_rx = control_mwdr_load.add_rx();
         let control_alu_op_rx = control_alu_op.add_rx();
         let control_cmp_op_rx = control_cmp_op.add_rx();
         let control_pc_mux_sel_rx = control_pc_mux_sel.add_rx();
         let control_alu_mux1_sel_rx = control_alu_mux1_sel.add_rx();
         let control_alu_mux2_sel_rx = control_alu_mux2_sel.add_rx();
         let control_rf_mux_sel_rx = control_rf_mux_sel.add_rx();
-        let control_mar_mux_sel_rx = control_mar_mux_sel.add_rx();
+        let control_mem_addr_mux_sel_rx = control_mem_addr_mux_sel.add_rx();
         let control_cmp_mux_sel_rx = control_cmp_mux_sel.add_rx();
         let control_mem_read_rx = control_mem_read.add_rx();
         let control_mem_write_rx = control_mem_write.add_rx();
@@ -359,21 +322,17 @@ impl Core {
         let ir_rs2_idx_rx = ir_rs2_idx.add_rx();
         let ir_rd_idx_rx = ir_rd_idx.add_rx();
         let pc_mux_out_rx = pc_mux_out.add_rx();
-        let pc_out_rx_mar_mux = pc_out.add_rx();
+        let pc_out_rx_mem_addr_mux = pc_out.add_rx();
         let pc_out_rx_pc_mux = pc_out.add_rx();
         let pc_out_rx_alu_mux1 = pc_out.add_rx();
         let pc_out_rx_rf_mux = pc_out.add_rx();
-        let mar_mux_out_rx = mar_mux_out.add_rx();
-        let mar_out_rx_mem_ctl = mar_out.add_rx();
-        let mar_out_rx_control = mar_out.add_rx();
-        let mar_out_rx_rf_mux = mar_out.add_rx();
-        let mar_out_rx_mwdr = mar_out.add_rx();
-        let mrdr_out_rx_ir = mrdr_out.add_rx();
-        let mrdr_out_rx_rf_mux = mrdr_out.add_rx();
+        let mem_addr_mux_out_rx_mem_ctl = mem_addr_mux_out.add_rx();
+        let mem_addr_mux_out_rx_control = mem_addr_mux_out.add_rx();
+        let mem_addr_mux_out_rx_rf_mux = mem_addr_mux_out.add_rx();
         let alu_mux1_out_rx = alu_mux1_out.add_rx();
         let alu_mux2_out_rx = alu_mux2_out.add_rx();
         let alu_out_rx_pc_mux = alu_out.add_rx();
-        let alu_out_rx_mar_mux = alu_out.add_rx();
+        let alu_out_rx_mem_addr_mux = alu_out.add_rx();
         let alu_out_rx_rf_mux = alu_out.add_rx();
         let cmp_mux_out_rx = cmp_mux_out.add_rx();
         let cmp_out_rx_control = cmp_out.add_rx();
@@ -383,8 +342,7 @@ impl Core {
         let regfile_rs1_data_rx_cmp = regfile_rs1_data.add_rx();
         let regfile_rs2_data_rx_alu_mux2 = regfile_rs2_data.add_rx();
         let regfile_rs2_data_rx_cmp_mux = regfile_rs2_data.add_rx();
-        let regfile_rs2_data_rx_mwdr = regfile_rs2_data.add_rx();
-        let mwdr_out_rx = mwdr_out.add_rx();
+        let regfile_rs2_data_rx_mem_ctl = regfile_rs2_data.add_rx();
 
         let pc_mux = Arc::new(Mutex::new(PcMux::new(
             3,
@@ -410,8 +368,8 @@ impl Core {
             sim_manager.clone(),
             ack_channel.0.clone(),
             pc.clone(),
-            mar_out_rx_mem_ctl,
-            mwdr_out_rx,
+            mem_addr_mux_out_rx_mem_ctl,
+            regfile_rs2_data_rx_mem_ctl,
             control_mem_read_rx,
             control_mem_rmask_rx,
             control_mem_write_rx,
@@ -438,21 +396,18 @@ impl Core {
             ir_funct7_rx,
             cmp_out_rx_control,
             ir_opcode_rx,
-            mar_out_rx_control,
+            mem_addr_mux_out_rx_control,
             mem_ctl_cpu_resp_rx,
-            control_mar_load,
-            control_mrdr_load,
             control_pc_load,
             control_ir_load,
             control_rf_load,
-            control_mwdr_load,
             control_alu_op,
             control_cmp_op,
             control_pc_mux_sel,
             control_alu_mux1_sel,
             control_alu_mux2_sel,
             control_rf_mux_sel,
-            control_mar_mux_sel,
+            control_mem_addr_mux_sel,
             control_cmp_mux_sel,
             control_mem_read,
             control_mem_write,
@@ -465,7 +420,7 @@ impl Core {
             sim_manager.clone(),
             ack_channel.0.clone(),
             control_ir_load_rx,
-            mrdr_out_rx_ir,
+            mem_ctl_cpu_rdata_rx_ir,
             ir_funct3,
             ir_funct7,
             ir_opcode,
@@ -479,32 +434,14 @@ impl Core {
             ir_rd_idx,
         )));
 
-        let mar_mux = Arc::new(Mutex::new(MarMux::new(
+        let mem_addr_mux = Arc::new(Mutex::new(MemAddrMux::new(
             5,
             sim_manager.clone(),
             ack_channel.0.clone(),
-            pc_out_rx_mar_mux,
-            alu_out_rx_mar_mux,
-            control_mar_mux_sel_rx,
-            mar_mux_out,
-        )));
-
-        let mar = Arc::new(Mutex::new(Mar::new(
-            6,
-            sim_manager.clone(),
-            ack_channel.0.clone(),
-            control_mar_load_rx,
-            mar_mux_out_rx,
-            mar_out,
-        )));
-
-        let mrdr = Arc::new(Mutex::new(Mrdr::new(
-            7,
-            sim_manager.clone(),
-            ack_channel.0.clone(),
-            control_mrdr_load_rx,
-            mem_ctl_cpu_rdata_rx,
-            mrdr_out,
+            pc_out_rx_mem_addr_mux,
+            alu_out_rx_mem_addr_mux,
+            control_mem_addr_mux_sel_rx,
+            mem_addr_mux_out,
         )));
 
         let alu_mux1 = Arc::new(Mutex::new(AluMux1::new(
@@ -568,8 +505,8 @@ impl Core {
             alu_out_rx_rf_mux,
             cmp_out_rx_rf_mux,
             ir_u_imm_rx_rf_mux,
-            mar_out_rx_rf_mux,
-            mrdr_out_rx_rf_mux,
+            mem_addr_mux_out_rx_rf_mux,
+            mem_ctl_cpu_rdata_rx_regfile_mux,
             pc_out_rx_rf_mux,
             control_rf_mux_sel_rx,
             regfile_mux_out,
@@ -588,25 +525,13 @@ impl Core {
             regfile_rs2_data,
         )));
 
-        let mwdr = Arc::new(Mutex::new(Mwdr::new(
-            15,
-            sim_manager.clone(),
-            ack_channel.0.clone(),
-            control_mwdr_load_rx,
-            mar_out_rx_mwdr,
-            regfile_rs2_data_rx_mwdr,
-            mwdr_out,
-        )));
-
         let components_vec: Vec<Arc<Mutex<dyn Component>>> = vec![
             mem_ctl.clone(),
             control.clone(),
             ir.clone(),
             pc_mux.clone(),
             pc.clone(),
-            mar_mux.clone(),
-            mar.clone(),
-            mrdr.clone(),
+            mem_addr_mux.clone(),
             alu_mux1.clone(),
             alu_mux2.clone(),
             alu.clone(),
@@ -614,7 +539,6 @@ impl Core {
             cmp.clone(),
             regfile_mux.clone(),
             regfile.clone(),
-            mwdr.clone(),
         ];
 
         let sim_dispatchers: Vec<_> = components_vec
@@ -639,9 +563,7 @@ impl Core {
             ir,
             pc_mux,
             pc,
-            mar_mux,
-            mar,
-            mrdr,
+            mem_addr_mux,
             alu_mux1,
             alu_mux2,
             alu,
@@ -652,7 +574,6 @@ impl Core {
             keyboard_mmio_ctl,
             vga_mmio_ctl,
             commit_file: Mutex::new(commit_file),
-            mwdr,
             stats,
         }
     }
