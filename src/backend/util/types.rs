@@ -111,7 +111,6 @@ pub enum States {
     Lui,
     Br,
     Auipc,
-    AddrCalc,
     Load,
     Store,
     Jal,

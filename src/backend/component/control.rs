@@ -309,20 +309,9 @@ impl Control {
                 }
                 self.load_pc(mux_sel::pc::PC_PLUS4);
             }
-            AddrCalc => {
-                self.mem_addr_mux_sel
-                    .send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
-                self.set_alu(
-                    mux_sel::alu1::RS1_OUT,
-                    if self.opcode.get_value() == Byte::from(opcode::LOAD) {
-                        mux_sel::alu2::I_IMM
-                    } else {
-                        mux_sel::alu2::S_IMM
-                    },
-                    alu_op::ADD,
-                );
-            }
             Load => {
+                self.mem_addr_mux_sel.send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
+                self.set_alu(mux_sel::alu1::RS1_OUT, mux_sel::alu2::I_IMM, alu_op::ADD);
                 self.read_from_mem();
                 if self.mem_resp.get_value().is_something_nonzero() {
                     if let Some(funct3) = Into::<Option<u8>>::into(self.funct3.get_value()) {
@@ -349,6 +338,8 @@ impl Control {
                 }
             }
             Store => {
+                self.mem_addr_mux_sel.send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
+                self.set_alu(mux_sel::alu1::RS1_OUT, mux_sel::alu2::S_IMM, alu_op::ADD);
                 self.write_to_mem();
                 if self.mem_resp.get_value().is_something_nonzero() {
                     self.load_pc(mux_sel::pc::PC_PLUS4);
@@ -384,18 +375,12 @@ impl Control {
                 Some(opcode::JAL) => Jal,
                 Some(opcode::JALR) => Jalr,
                 Some(opcode::BR) => Br,
-                Some(opcode::LOAD) | Some(opcode::STORE) => AddrCalc,
+                Some(opcode::LOAD) => Load,
+                Some(opcode::STORE) => Store,
                 Some(opcode::IMM) => Imm,
                 Some(opcode::REG) => Reg,
                 _ => Fetch,
             },
-            AddrCalc => {
-                if self.opcode.get_value() == Byte::from(opcode::LOAD) {
-                    Load
-                } else {
-                    Store
-                }
-            }
             Load => {
                 if self.mem_resp.get_value().is_something_nonzero() {
                     Fetch

@@ -98,7 +98,6 @@ impl Core {
             if !ir.can_end()
                 && (control.state == States::Fetch
                     || control.state == States::Decode
-                    || control.state == States::AddrCalc
                     || ((control.state == States::Load || control.state == States::Store)
                         && !mem_ctl.cpu_resp.get_value().is_something_nonzero()))
             {
