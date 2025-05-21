@@ -22,9 +22,7 @@ use std::sync::{Arc, Mutex};
     "input": [
         ["cpu_addr", "Word"],
         ["cpu_wdata", "Word"],
-        ["cpu_read_en", "Byte"],
         ["cpu_rmask", "Byte"],
-        ["cpu_write_en", "Byte"],
         ["cpu_wmask", "Byte"]
     ],
     "output": [
@@ -51,9 +49,7 @@ impl MemCtl {
         pc: Arc<Mutex<Pc>>,
         cpu_addr: Rx<Word>,
         cpu_wdata: Rx<Word>,
-        cpu_read_en: Rx<Byte>,
         cpu_rmask: Rx<Byte>,
-        cpu_write_en: Rx<Byte>,
         cpu_wmask: Rx<Byte>,
         cpu_rdata: Tx<Word>,
         cpu_resp: Tx<Byte>,
@@ -73,9 +69,7 @@ impl MemCtl {
             clock_receiver: clock_channel.1,
             cpu_addr,
             cpu_wdata,
-            cpu_read_en,
             cpu_rmask,
-            cpu_write_en,
             cpu_wmask,
             cpu_rdata,
             cpu_resp,
@@ -100,57 +94,55 @@ impl MemCtl {
         //can recv request
         if !self.is_busy {
             // a r/w request came in
-            if self.cpu_write_en.get_value().is_something_nonzero() {
-                if let Some(wmask) = Into::<Option<u8>>::into(self.cpu_wmask.get_value()) {
-                    if let Some(raw_addr_idx) = Into::<Option<u32>>::into(self.cpu_addr.get_value())
-                    {
-                        for i in 0..4 {
-                            if (wmask >> i) & 0x1 == 0x1 {
-                                let addr_idx = (raw_addr_idx & 0xFFFFFFFCu32) + i as u32;
-                                let data = (self.cpu_wdata.get_value()
-                                    << Word::from(8 * (raw_addr_idx & 0x3)))[i]
-                                    .map(Byte::from)
-                                    .unwrap_or(Byte::unknown());
+            if let Some(wmask) = Into::<Option<u8>>::into(self.cpu_wmask.get_value())
+                && wmask != 0
+            {
+                if let Some(raw_addr_idx) = Into::<Option<u32>>::into(self.cpu_addr.get_value()) {
+                    for i in 0..4 {
+                        if (wmask >> i) & 0x1 == 0x1 {
+                            let addr_idx = (raw_addr_idx & 0xFFFFFFFCu32) + i as u32;
+                            let data = (self.cpu_wdata.get_value()
+                                << Word::from(8 * (raw_addr_idx & 0x3)))[i]
+                                .map(Byte::from)
+                                .unwrap_or(Byte::unknown());
 
-                                let mut written_to_mmio = false;
-                                for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
-                                    if addr_range.contains(&addr_idx) {
-                                        mmio_ctl.lock().unwrap().write(Word::from(addr_idx), data);
-                                        written_to_mmio = true;
-                                    }
+                            let mut written_to_mmio = false;
+                            for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
+                                if addr_range.contains(&addr_idx) {
+                                    mmio_ctl.lock().unwrap().write(Word::from(addr_idx), data);
+                                    written_to_mmio = true;
                                 }
+                            }
 
-                                if !written_to_mmio {
-                                    self.backend_mem.insert(Word::from(addr_idx), data);
-                                }
+                            if !written_to_mmio {
+                                self.backend_mem.insert(Word::from(addr_idx), data);
                             }
                         }
                     }
                 }
                 self.cpu_resp.send(Byte::from(1u8), 0);
                 self.is_busy = true;
-            } else if self.cpu_read_en.get_value().is_something_nonzero() {
+            } else if let Some(rmask) = Into::<Option<u8>>::into(self.cpu_rmask.get_value())
+                && rmask != 0
+            {
                 let mut ret = Word::unknown();
-                if let Some(rmask) = Into::<Option<u8>>::into(self.cpu_rmask.get_value()) {
-                    for i in 0..4 {
-                        if (rmask >> i) & 0x1 == 0x1 {
-                            let addr_idx = (self.cpu_addr.get_value() & Word::from(0xFFFFFFFCu32))
-                                + Word::from(i as u32);
-                            if self.backend_mem.contains_key(&addr_idx) {
-                                ret[i] = self.backend_mem[&addr_idx].into();
-                            } else {
-                                for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
-                                    if let Some(addr_idx_u32) = addr_idx.into() {
-                                        if addr_range.contains(&addr_idx_u32) {
-                                            ret[i] = mmio_ctl.lock().unwrap().read(addr_idx).into();
-                                        }
+                for i in 0..4 {
+                    if (rmask >> i) & 0x1 == 0x1 {
+                        let addr_idx = (self.cpu_addr.get_value() & Word::from(0xFFFFFFFCu32))
+                            + Word::from(i as u32);
+                        if self.backend_mem.contains_key(&addr_idx) {
+                            ret[i] = self.backend_mem[&addr_idx].into();
+                        } else {
+                            for (addr_range, mmio_ctl) in self.mmio_ctl.iter_mut() {
+                                if let Some(addr_idx_u32) = addr_idx.into() {
+                                    if addr_range.contains(&addr_idx_u32) {
+                                        ret[i] = mmio_ctl.lock().unwrap().read(addr_idx).into();
                                     }
                                 }
                             }
                         }
                     }
                 }
-
                 self.cpu_rdata.send(ret, 0);
                 self.cpu_resp.send(Byte::from(1u8), 0);
                 self.is_busy = true;

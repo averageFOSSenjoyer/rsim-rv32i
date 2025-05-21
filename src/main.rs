@@ -1,3 +1,5 @@
+#![feature(let_chains)]
+
 use crate::frontend::core_app::CoreApp;
 
 mod backend;

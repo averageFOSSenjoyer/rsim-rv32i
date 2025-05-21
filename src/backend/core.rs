@@ -262,8 +262,6 @@ impl Core {
         let mut control_mem_addr_mux_sel =
             Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_cmp_mux_sel = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut control_mem_read = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
-        let mut control_mem_write = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_mem_rmask = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut control_mem_wmask = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
         let mut ir_funct3 = Tx::<Byte>::new(sim_manager.clone(), ack_channel.0.clone());
@@ -303,8 +301,6 @@ impl Core {
         let control_rf_mux_sel_rx = control_rf_mux_sel.add_rx();
         let control_mem_addr_mux_sel_rx = control_mem_addr_mux_sel.add_rx();
         let control_cmp_mux_sel_rx = control_cmp_mux_sel.add_rx();
-        let control_mem_read_rx = control_mem_read.add_rx();
-        let control_mem_write_rx = control_mem_write.add_rx();
         let control_mem_rmask_rx = control_mem_rmask.add_rx();
         let control_mem_wmask_rx = control_mem_wmask.add_rx();
         let ir_funct3_rx = ir_funct3.add_rx();
@@ -369,9 +365,7 @@ impl Core {
             pc.clone(),
             mem_addr_mux_out_rx_mem_ctl,
             regfile_rs2_data_rx_mem_ctl,
-            control_mem_read_rx,
             control_mem_rmask_rx,
-            control_mem_write_rx,
             control_mem_wmask_rx,
             mem_ctl_cpu_rdata,
             mem_ctl_cpu_resp,
@@ -408,8 +402,6 @@ impl Core {
             control_rf_mux_sel,
             control_mem_addr_mux_sel,
             control_cmp_mux_sel,
-            control_mem_read,
-            control_mem_write,
             control_mem_rmask,
             control_mem_wmask,
         )));

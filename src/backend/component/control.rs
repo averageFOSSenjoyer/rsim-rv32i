@@ -35,8 +35,6 @@ use std::sync::Arc;
         ["regfile_mux_sel", "Byte"],
         ["mem_addr_mux_sel", "Byte"],
         ["cmp_mux_sel", "Byte"],
-        ["mem_read", "Byte"],
-        ["mem_write", "Byte"],
         ["mem_rmask", "Byte"],
         ["mem_wmask", "Byte"]
     ],
@@ -70,8 +68,6 @@ impl Control {
         regfile_mux_sel: Tx<Byte>,
         mem_addr_mux_sel: Tx<Byte>,
         cmp_mux_sel: Tx<Byte>,
-        mem_read: Tx<Byte>,
-        mem_write: Tx<Byte>,
         mem_rmask: Tx<Byte>,
         mem_wmask: Tx<Byte>,
     ) -> Self {
@@ -102,8 +98,6 @@ impl Control {
             regfile_mux_sel,
             mem_addr_mux_sel,
             cmp_mux_sel,
-            mem_read,
-            mem_write,
             mem_rmask,
             mem_wmask,
         }
@@ -156,10 +150,8 @@ impl Control {
         self.load_pc.send(Byte::from(0u8), 0);
         self.load_ir.send(Byte::from(0u8), 0);
         self.load_regfile.send(Byte::from(0u8), 0);
-        self.mem_read.send(Byte::from(0u8), 0);
-        self.mem_write.send(Byte::from(0u8), 0);
-        self.mem_wmask.send(self.get_wmask(), 0);
-        self.mem_rmask.send(self.get_rmask(), 0);
+        self.mem_wmask.send(Byte::from(0u8), 0);
+        self.mem_rmask.send(Byte::from(0u8), 0);
     }
 
     fn load_pc(&mut self, sel: u8) {
@@ -188,11 +180,11 @@ impl Control {
     }
 
     fn read_from_mem(&mut self) {
-        self.mem_read.send(Byte::from(1u8), 0);
+        self.mem_rmask.send(self.get_rmask(), 0);
     }
 
     fn write_to_mem(&mut self) {
-        self.mem_write.send(Byte::from(1u8), 0);
+        self.mem_wmask.send(self.get_wmask(), 0);
     }
 
     fn set_control_signal(&mut self) {
@@ -310,7 +302,8 @@ impl Control {
                 self.load_pc(mux_sel::pc::PC_PLUS4);
             }
             Load => {
-                self.mem_addr_mux_sel.send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
+                self.mem_addr_mux_sel
+                    .send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
                 self.set_alu(mux_sel::alu1::RS1_OUT, mux_sel::alu2::I_IMM, alu_op::ADD);
                 self.read_from_mem();
                 if self.mem_resp.get_value().is_something_nonzero() {
@@ -338,7 +331,8 @@ impl Control {
                 }
             }
             Store => {
-                self.mem_addr_mux_sel.send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
+                self.mem_addr_mux_sel
+                    .send(Byte::from(mux_sel::mem_addr::ALU_OUT), 0);
                 self.set_alu(mux_sel::alu1::RS1_OUT, mux_sel::alu2::S_IMM, alu_op::ADD);
                 self.write_to_mem();
                 if self.mem_resp.get_value().is_something_nonzero() {

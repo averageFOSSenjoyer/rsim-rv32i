@@ -472,18 +472,8 @@ impl DatapathComponentDisplayer for MemCtl {
                         [RegFile_rs2_data_MemCtl_wdata].into(),
                     ),
                     PortValue::new(
-                        "rd_en".to_string(),
-                        format!("0b{:1b}", self.cpu_read_en.get_value()),
-                        [].into(),
-                    ),
-                    PortValue::new(
                         "rmask".to_string(),
                         format!("0b{:4b}", self.cpu_rmask.get_value()),
-                        [].into(),
-                    ),
-                    PortValue::new(
-                        "wr_en".to_string(),
-                        format!("0b{:1b}", self.cpu_write_en.get_value()),
                         [].into(),
                     ),
                     PortValue::new(
