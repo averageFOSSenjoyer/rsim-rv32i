@@ -16,13 +16,9 @@ pub enum DatapathNet {
     Ir_rs1_idx_RegFile_rs1_idx,
     Ir_rs2_idx_RegFile_rs2_idx,
     Ir_rd_idx_RegFile_rd_idx,
-    Ir_u_imm_RegFileMux_u_imm,
-    Ir_i_imm_AluMux2_i_imm,
-    Ir_i_imm_CmpMux_i_imm,
-    Ir_u_imm_AluMux2_u_imm,
-    Ir_b_imm_AluMux2_b_imm,
-    Ir_s_imm_AluMux2_s_imm,
-    Ir_j_imm_AluMux2_j_imm,
+    Ir_imm_RegFileMux_u_imm,
+    Ir_imm_AluMux2_imm,
+    Ir_imm_CmpMux_i_imm,
     AluMux2_out_Alu_b,
     AluMux1_out_Alu_a,
     RegFile_rs1_data_AluMux1_rs1_data,
@@ -93,7 +89,7 @@ impl DatapathNetDispalyer for DatapathNet {
                 ]
             }
             Ir_rs1_idx_RegFile_rs1_idx => {
-                let start = self.get_nth_port_pos(&Ir, 5, false);
+                let start = self.get_nth_port_pos(&Ir, 1, false);
                 let end = self.get_nth_port_pos(&RegFile, 0, true);
                 let mid = Pos2::new(
                     (start + Vec2::new(60.0, 0.0)).x,
@@ -109,7 +105,7 @@ impl DatapathNetDispalyer for DatapathNet {
                 ]
             }
             Ir_rs2_idx_RegFile_rs2_idx => {
-                let start = self.get_nth_port_pos(&Ir, 6, false);
+                let start = self.get_nth_port_pos(&Ir, 2, false);
                 let end = self.get_nth_port_pos(&RegFile, 1, true);
                 let mid = Pos2::new(
                     (start + Vec2::new(70.0, 0.0)).x,
@@ -125,7 +121,7 @@ impl DatapathNetDispalyer for DatapathNet {
                 ]
             }
             Ir_rd_idx_RegFile_rd_idx => {
-                let start = self.get_nth_port_pos(&Ir, 7, false);
+                let start = self.get_nth_port_pos(&Ir, 3, false);
                 let end = self.get_nth_port_pos(&RegFile, 2, true);
                 let mid = Pos2::new(
                     (start + Vec2::new(80.0, 0.0)).x,
@@ -140,8 +136,8 @@ impl DatapathNetDispalyer for DatapathNet {
                     end,
                 ]
             }
-            Ir_u_imm_RegFileMux_u_imm => {
-                let start = self.get_nth_port_pos(&Ir, 1, false);
+            Ir_imm_RegFileMux_u_imm => {
+                let start = self.get_nth_port_pos(&Ir, 0, false);
                 let end = self.get_nth_port_pos(&RegFileMux, 2, true);
                 vec![
                     start,
@@ -150,7 +146,7 @@ impl DatapathNetDispalyer for DatapathNet {
                     end,
                 ]
             }
-            Ir_i_imm_AluMux2_i_imm => {
+            Ir_imm_AluMux2_imm => {
                 let start = self.get_nth_port_pos(&Ir, 0, false);
                 let end = self.get_nth_port_pos(&AluMux2, 0, true);
                 let mid = Pos2::new(
@@ -169,7 +165,7 @@ impl DatapathNetDispalyer for DatapathNet {
                     end,
                 ]
             }
-            Ir_i_imm_CmpMux_i_imm => {
+            Ir_imm_CmpMux_i_imm => {
                 let start = self.get_nth_port_pos(&Ir, 0, false);
                 let end = self.get_nth_port_pos(&CmpMux, 1, true);
                 vec![
@@ -178,82 +174,6 @@ impl DatapathNetDispalyer for DatapathNet {
                     start + Vec2::new(10.0, 200.0),
                     start + Vec2::new(40.0, 200.0),
                     end + Vec2::new(-450.0, 0.0),
-                    end,
-                ]
-            }
-            Ir_u_imm_AluMux2_u_imm => {
-                let start = self.get_nth_port_pos(&Ir, 1, false);
-                let end = self.get_nth_port_pos(&AluMux2, 1, true);
-                let mid = Pos2::new(
-                    (start + Vec2::new(20.0, 0.0)).x,
-                    Ir.get_frame_offset().y - 80.0,
-                );
-                vec![
-                    start,
-                    start + Vec2::new(20.0, 0.0),
-                    mid,
-                    mid + Vec2::new(
-                        100.0 + GLOBAL_FRAME_WIDTH + 50.0 + GLOBAL_FRAME_WIDTH + 80.0,
-                        0.0,
-                    ),
-                    end + Vec2::new(-20.0, 0.0),
-                    end,
-                ]
-            }
-            Ir_b_imm_AluMux2_b_imm => {
-                let start = self.get_nth_port_pos(&Ir, 2, false);
-                let end = self.get_nth_port_pos(&AluMux2, 2, true);
-                let mid = Pos2::new(
-                    (start + Vec2::new(30.0, 0.0)).x,
-                    Ir.get_frame_offset().y - 70.0,
-                );
-                vec![
-                    start,
-                    start + Vec2::new(30.0, 0.0),
-                    mid,
-                    mid + Vec2::new(
-                        90.0 + GLOBAL_FRAME_WIDTH + 50.0 + GLOBAL_FRAME_WIDTH + 70.0,
-                        0.0,
-                    ),
-                    end + Vec2::new(-30.0, 0.0),
-                    end,
-                ]
-            }
-            Ir_s_imm_AluMux2_s_imm => {
-                let start = self.get_nth_port_pos(&Ir, 3, false);
-                let end = self.get_nth_port_pos(&AluMux2, 3, true);
-                let mid = Pos2::new(
-                    (start + Vec2::new(40.0, 0.0)).x,
-                    Ir.get_frame_offset().y - 60.0,
-                );
-                vec![
-                    start,
-                    start + Vec2::new(40.0, 0.0),
-                    mid,
-                    mid + Vec2::new(
-                        80.0 + GLOBAL_FRAME_WIDTH + 50.0 + GLOBAL_FRAME_WIDTH + 60.0,
-                        0.0,
-                    ),
-                    end + Vec2::new(-40.0, 0.0),
-                    end,
-                ]
-            }
-            Ir_j_imm_AluMux2_j_imm => {
-                let start = self.get_nth_port_pos(&Ir, 4, false);
-                let end = self.get_nth_port_pos(&AluMux2, 4, true);
-                let mid = Pos2::new(
-                    (start + Vec2::new(50.0, 0.0)).x,
-                    Ir.get_frame_offset().y - 50.0,
-                );
-                vec![
-                    start,
-                    start + Vec2::new(50.0, 0.0),
-                    mid,
-                    mid + Vec2::new(
-                        70.0 + GLOBAL_FRAME_WIDTH + 50.0 + GLOBAL_FRAME_WIDTH + 50.0,
-                        0.0,
-                    ),
-                    end + Vec2::new(-50.0, 0.0),
                     end,
                 ]
             }
@@ -295,11 +215,9 @@ impl DatapathNetDispalyer for DatapathNet {
             }
             RegFile_rs2_data_AluMux2_rs2_data => {
                 let start = self.get_nth_port_pos(&RegFile, 1, false);
-                let end = self.get_nth_port_pos(&AluMux2, 5, true);
+                let end = self.get_nth_port_pos(&AluMux2, 1, true);
                 vec![
                     start,
-                    start + Vec2::new(30.0, 0.0),
-                    end + Vec2::new(-70.0, 0.0),
                     end,
                 ]
             }

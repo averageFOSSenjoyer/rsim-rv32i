@@ -60,10 +60,17 @@ impl Widget for DatapathComponentWidget {
         let name = self.datapath_component.name;
         let port_values = self.datapath_component.values;
         let on_hover = |ui: &mut Ui, port_value: &PortValue| {
+
             ui.label(port_value.name.clone()).on_hover_ui(|ui| {
-                ui.add_sized(Vec2::new(90.0, 10.0), |ui: &mut Ui| {
-                    ui.text_edit_singleline(&mut port_value.value.clone())
-                });
+                if port_value.value.contains('\n') {
+                    ui.add_sized(Vec2::new(135.0, 10.0), |ui: &mut Ui| {
+                        ui.text_edit_multiline(&mut port_value.value.clone())
+                    });
+                } else {
+                    ui.add_sized(Vec2::new(90.0, 10.0), |ui: &mut Ui| {
+                        ui.text_edit_singleline(&mut port_value.value.clone())
+                    });
+                }
                 for associated_net in port_value.associated_nets.iter() {
                     let mut points = associated_net.get_points();
                     for point in points.iter_mut() {
@@ -231,29 +238,21 @@ impl DatapathComponentDisplayer for AluMux2 {
             values: PortValues::new(
                 vec![
                     PortValue::new(
-                        "i_imm".to_string(),
-                        format!("0x{:X}", self.i_imm.get_value()),
-                        [Ir_i_imm_AluMux2_i_imm].into(),
-                    ),
-                    PortValue::new(
-                        "u_imm".to_string(),
-                        format!("0x{:X}", self.u_imm.get_value()),
-                        [Ir_u_imm_AluMux2_u_imm].into(),
-                    ),
-                    PortValue::new(
-                        "b_imm".to_string(),
-                        format!("0x{:X}", self.b_imm.get_value()),
-                        [Ir_b_imm_AluMux2_b_imm].into(),
-                    ),
-                    PortValue::new(
-                        "s_imm".to_string(),
-                        format!("0x{:X}", self.s_imm.get_value()),
-                        [Ir_s_imm_AluMux2_s_imm].into(),
-                    ),
-                    PortValue::new(
-                        "j_imm".to_string(),
-                        format!("0x{:X}", self.j_imm.get_value()),
-                        [Ir_j_imm_AluMux2_j_imm].into(),
+                        "imm".to_string(),
+                        format!("\
+                        i_imm: 0x{:X}\n\
+                        u_imm: 0x{:X}\n\
+                        b_imm: 0x{:X}\n\
+                        s_imm: 0x{:X}\n\
+                        j_imm: 0x{:X}\
+                        ",
+                                self.i_imm.get_value(),
+                                self.u_imm.get_value(),
+                                self.b_imm.get_value(),
+                                self.s_imm.get_value(),
+                                self.j_imm.get_value(),
+                        ),
+                        [Ir_imm_AluMux2_imm].into(),
                     ),
                     PortValue::new(
                         "rs2_data".to_string(),
@@ -290,7 +289,7 @@ impl DatapathComponentDisplayer for CmpMux {
                     PortValue::new(
                         "i_imm".to_string(),
                         format!("0x{:X}", self.i_imm.get_value()),
-                        [Ir_i_imm_CmpMux_i_imm].into(),
+                        [Ir_imm_CmpMux_i_imm].into(),
                     ),
                     PortValue::new(
                         "sel".to_string(),
@@ -359,29 +358,21 @@ impl DatapathComponentDisplayer for IR {
                 ],
                 vec![
                     PortValue::new(
-                        "i_imm".to_string(),
-                        format!("0x{:X}", self.i_imm.get_value()),
-                        [Ir_i_imm_CmpMux_i_imm, Ir_i_imm_AluMux2_i_imm].into(),
-                    ),
-                    PortValue::new(
-                        "u_imm".to_string(),
-                        format!("0x{:X}", self.u_imm.get_value()),
-                        [Ir_u_imm_AluMux2_u_imm, Ir_u_imm_RegFileMux_u_imm].into(),
-                    ),
-                    PortValue::new(
-                        "b_imm".to_string(),
-                        format!("0x{:X}", self.b_imm.get_value()),
-                        [Ir_b_imm_AluMux2_b_imm].into(),
-                    ),
-                    PortValue::new(
-                        "s_imm".to_string(),
-                        format!("0x{:X}", self.s_imm.get_value()),
-                        [Ir_s_imm_AluMux2_s_imm].into(),
-                    ),
-                    PortValue::new(
-                        "j_imm".to_string(),
-                        format!("0x{:X}", self.j_imm.get_value()),
-                        [Ir_j_imm_AluMux2_j_imm].into(),
+                        "imm".to_string(),
+                        format!("\
+                        i_imm: 0x{:X}\n\
+                        u_imm: 0x{:X}\n\
+                        b_imm: 0x{:X}\n\
+                        s_imm: 0x{:X}\n\
+                        j_imm: 0x{:X}\
+                        ",
+                                self.i_imm.get_value(),
+                                self.u_imm.get_value(),
+                                self.b_imm.get_value(),
+                                self.s_imm.get_value(),
+                                self.j_imm.get_value(),
+                        ),
+                        [Ir_imm_CmpMux_i_imm, Ir_imm_AluMux2_imm].into(),
                     ),
                     PortValue::new(
                         "rs1_idx".to_string(),
@@ -637,7 +628,7 @@ impl DatapathComponentDisplayer for RegFileMux {
                     PortValue::new(
                         "u_imm".to_string(),
                         format!("0x{:X}", self.u_imm.get_value()),
-                        [Ir_u_imm_RegFileMux_u_imm].into(),
+                        [Ir_imm_RegFileMux_u_imm].into(),
                     ),
                     PortValue::new(
                         "m_addr".to_string(),
