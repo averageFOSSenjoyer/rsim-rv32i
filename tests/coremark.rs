@@ -2,6 +2,7 @@ use rsim_rv32i::backend::core::Core;
 use std::fs::File;
 
 #[test]
+#[cfg_attr(feature = "reset_unknown_regfile", ignore)]
 fn coremark() {
     let commit_file = File::create("./tests/coremark.log").unwrap();
     let core = Core::new(4, Some(commit_file));

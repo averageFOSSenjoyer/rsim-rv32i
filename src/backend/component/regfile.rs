@@ -40,15 +40,27 @@ impl Registers {
         }
     }
 
+    const fn default_data() -> [Word; 32] {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "reset_unknown_regfile")] {
+                let mut registers = [Word::unknown(); 32];
+                registers[0] = Word::zeros();
+                registers
+            } else {
+                [Word::zeros(); 32]
+            }
+        }
+    }
+
     fn reset(&mut self) {
-        self.data = [Word::zeros(); 32];
+        self.data = Registers::default_data();
     }
 }
 
 impl Default for Registers {
     fn default() -> Self {
         Self {
-            data: [Word::zeros(); 32],
+            data: Registers::default_data(),
         }
     }
 }

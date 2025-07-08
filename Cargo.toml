@@ -3,6 +3,10 @@ name = "rsim_rv32i"
 version = "1.0.0-beta.3"
 edition = "2024"
 
+[features]
+default = ["reset_unknown_regfile"]
+reset_unknown_regfile = []
+
 [dependencies]
 rsim_core = { git = "ssh://git@github.com:22/averageFOSSenjoyer/rsim-core.git" }
 rsim_macro = { git = "ssh://git@github.com:22/averageFOSSenjoyer/rsim-macro.git" }
@@ -27,6 +31,7 @@ rfd = "0.15.2"
 futures = "0.3.31"
 web-time = "1.1.0"
 elf = "0.7.4"
+cfg-if = "1.0"
 
 [dev-dependencies]
 rand = "0.8.5"

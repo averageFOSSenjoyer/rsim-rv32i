@@ -2477,6 +2477,7 @@ dependencies = [
 name = "rsim_rv32i"
 version = "1.0.0-beta.3"
 dependencies = [
+ "cfg-if",
  "console_error_panic_hook",
  "console_log",
  "crossbeam-channel",

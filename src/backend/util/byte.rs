@@ -47,10 +47,10 @@ pub struct Bytes<const T: usize> {
 }
 
 impl<const T: usize> Bytes<T> {
-    pub fn unknown() -> Self {
+    pub const fn unknown() -> Self {
         Bytes { data: [None; T] }
     }
-    pub fn zeros() -> Self {
+    pub const fn zeros() -> Self {
         Bytes { data: [Some(0); T] }
     }
     pub fn has_unknown(&self) -> bool {
